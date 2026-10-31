@@ -52,7 +52,8 @@ public class ControlsInstrumentedTest {
     private void tap(MainActivity a,int button,int holdMillis){
         TouchControlsView v=a.controlsForTest();float x,y;
         if(button==SegaButtons.START){x=v.centerX(2);y=v.centerY(2);}
-        else if(button==SegaButtons.A||button==SegaButtons.B||button==SegaButtons.C){int i=button==SegaButtons.A?0:button==SegaButtons.B?1:2;x=v.faceX(i);y=v.faceY(i);}
+        else if(button==SegaButtons.A||button==SegaButtons.B||button==SegaButtons.C||button==SegaButtons.X||button==SegaButtons.Y||button==SegaButtons.Z){
+            int i=button==SegaButtons.A?0:button==SegaButtons.B?1:button==SegaButtons.C?2:button==SegaButtons.X?3:button==SegaButtons.Y?4:5;x=v.faceX(i);y=v.faceY(i);}
         else{x=v.centerX(0)+(button==SegaButtons.LEFT?-v.padRadius()*.7f:button==SegaButtons.RIGHT?v.padRadius()*.7f:0);y=v.centerY(0)+(button==SegaButtons.UP?-v.padRadius()*.7f:button==SegaButtons.DOWN?v.padRadius()*.7f:0);}
         v.getLocationOnScreen(location);
         android.util.Log.e("SEGA_TOUCH","button="+button+" x="+x+" y="+y+" loc="+location[0]+","+location[1]+" size="+v.getWidth()+"x"+v.getHeight()+" hit="+v.hitMask(x,y));
@@ -77,18 +78,28 @@ public class ControlsInstrumentedTest {
         Intent intent=new Intent(ApplicationProvider.getApplicationContext(),MainActivity.class).putExtra(MainActivity.EXTRA_TEST_ROM,path);
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(intent)){
             await(scenario,a->a.engineForTest().frame()!=null&&a.rendererForTest().frameSerial()>120);
+            assertEquals(6,activity(scenario).controlsForTest().faceButtonCount());
             // All waits/injections run on the test thread, never block the UI dispatcher.
             tap(activity(scenario),SegaButtons.START,300);SystemClock.sleep(12000);
             tap(activity(scenario),SegaButtons.START,300);SystemClock.sleep(12000);
             tap(activity(scenario),SegaButtons.C,300);SystemClock.sleep(1500);
             tap(activity(scenario),SegaButtons.C,300);SystemClock.sleep(15000);
             screenshot(activity(scenario),"match-before");
-            for(int button:new int[]{SegaButtons.RIGHT,SegaButtons.LEFT,SegaButtons.UP,SegaButtons.DOWN,SegaButtons.A,SegaButtons.B,SegaButtons.C}){
+            for(int button:new int[]{SegaButtons.RIGHT,SegaButtons.LEFT,SegaButtons.UP,SegaButtons.DOWN,SegaButtons.A,SegaButtons.B,SegaButtons.C,SegaButtons.X,SegaButtons.Y,SegaButtons.Z}){
                 tap(activity(scenario),button,button>=SegaButtons.UP?650:220);screenshot(activity(scenario),"input-"+button);
             }
             multitouch(activity(scenario));
-            scenario.onActivity(a->a.rendererForTest().setBilinear(true));await(scenario,a->a.rendererForTest().appliedFilter()==GLES20.GL_LINEAR);screenshot(activity(scenario),"bilinear-on");
-            scenario.onActivity(a->a.rendererForTest().setBilinear(false));await(scenario,a->a.rendererForTest().appliedFilter()==GLES20.GL_NEAREST);screenshot(activity(scenario),"bilinear-off");
+            scenario.onActivity(a->a.rendererForTest().setVideoMode(com.midoali.atari.core.ControlLayout.VIDEO_ENHANCED));
+            await(scenario,a->a.rendererForTest().appliedVideoMode()==com.midoali.atari.core.ControlLayout.VIDEO_ENHANCED);screenshot(activity(scenario),"enhanced");
+            scenario.onActivity(a->a.rendererForTest().setVideoMode(com.midoali.atari.core.ControlLayout.VIDEO_ORIGINAL));
+            await(scenario,a->a.rendererForTest().appliedFilter()==GLES20.GL_NEAREST);screenshot(activity(scenario),"original");
+            scenario.onActivity(a->a.rendererForTest().setVideoMode(com.midoali.atari.core.ControlLayout.VIDEO_SMOOTH));
+            await(scenario,a->a.rendererForTest().appliedFilter()==GLES20.GL_LINEAR);screenshot(activity(scenario),"smooth");
+            scenario.onActivity(a->a.rendererForTest().setDisplayMode(com.midoali.atari.core.ControlLayout.DISPLAY_STRETCH));
+            await(scenario,a->{int[] vp=a.rendererForTest().appliedViewport();return vp[2]==a.controlsForTest().getWidth()&&vp[3]==a.controlsForTest().getHeight();});
+            scenario.onActivity(a->a.rendererForTest().setDisplayMode(com.midoali.atari.core.ControlLayout.DISPLAY_FIT));
+            await(scenario,a->{int[] vp=a.rendererForTest().appliedViewport();return vp[0]>=0&&vp[1]>=0&&vp[2]<=a.controlsForTest().getWidth()&&vp[3]<=a.controlsForTest().getHeight();});
+            screenshot(activity(scenario),"fit-full");
             MainActivity a=activity(scenario);float old=a.controlsForTest().centerX(0);
             scenario.onActivity(x->x.controlsForTest().setEditing(true));
             inject(event(a,MotionEvent.ACTION_DOWN,a.controlsForTest().centerX(0),a.controlsForTest().centerY(0)));
@@ -98,7 +109,7 @@ public class ControlsInstrumentedTest {
             scenario.onActivity(x->{x.layoutForTest().setScale(1.3f);x.layoutForTest().setOpacity(.5f);x.layoutForTest().bilinear=true;new SettingsStore(x).save(x.layoutForTest());x.controlsForTest().setEditing(false);});
             screenshot(a,"layout-edit");
             scenario.recreate();await(scenario,restored->restored.engineForTest().frame()!=null&&restored.rendererForTest().appliedFilter()==GLES20.GL_LINEAR);
-            scenario.onActivity(restored->{assertEquals(1.3f,restored.layoutForTest().scale,.001);assertEquals(.5f,restored.layoutForTest().opacity,.001);assertTrue(restored.layoutForTest().padX>.16f);assertTrue(restored.layoutForTest().bilinear);});
+            scenario.onActivity(restored->{assertEquals(1.3f,restored.layoutForTest().scale,.001);assertEquals(.5f,restored.layoutForTest().opacity,.001);assertTrue(restored.layoutForTest().padX>.16f);assertTrue(restored.layoutForTest().bilinear);assertTrue(restored.layoutForTest().sixButton);assertEquals(6,restored.controlsForTest().faceButtonCount());});
         }
     }
 }

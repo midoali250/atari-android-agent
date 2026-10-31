@@ -1,270 +1,296 @@
 #include <jni.h>
-#include <android/log.h>
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include "libretro.h"
+#include <time.h>
+#include <android/log.h>
+#include "genesis-plus-gx/libretro/libretro-common/include/libretro.h"
 
+#define MAX_ROM (16u * 1024u * 1024u)
+#define MAX_WIDTH 1024
+#define MAX_HEIGHT 576
+#define AUDIO_CAPACITY 32768
 #define LOG_TAG "SegaNative"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
-#define FRAME_PIXELS (1024 * 576)
-#define AUDIO_FRAMES 16384
+
+void retro_set_environment(retro_environment_t);
+void retro_set_video_refresh(retro_video_refresh_t);
+void retro_set_audio_sample_batch(retro_audio_sample_batch_t);
+void retro_set_audio_sample(retro_audio_sample_t);
+void retro_set_input_poll(retro_input_poll_t);
+void retro_set_input_state(retro_input_state_t);
+void retro_init(void);
+void retro_deinit(void);
+void retro_get_system_av_info(struct retro_system_av_info *);
+bool retro_load_game(const struct retro_game_info *);
+void retro_unload_game(void);
+void retro_run(void);
+void retro_reset(void);
+void retro_set_controller_port_device(unsigned, unsigned);
+size_t retro_get_memory_size(unsigned);
+void *retro_get_memory_data(unsigned);
 
 static pthread_mutex_t core_mutex = PTHREAD_MUTEX_INITIALIZER;
-static atomic_uint input_mask = 0;
-static bool initialized = false;
-static bool loaded = false;
-static uint16_t frame[FRAME_PIXELS];
-static int16_t audio[AUDIO_FRAMES * 2];
-static size_t audio_count = 0;
-static unsigned frame_width = 0, frame_height = 0;
-static uint64_t frame_serial = 0;
-static double fps = 60.0, sample_rate = 44100.0;
-static unsigned max_width = 348, max_height = 288;
-#ifdef SEGA_ENABLE_TEST_API
-static atomic_uint input_queries[16] = {};
-static atomic_int last_mask = 0;
-#endif
+static atomic_int input_mask;
+static atomic_bool show_borders = true, auto_frame_skip = false, options_updated = false;
+static bool loaded;
+static uint8_t *rom_data;
+static size_t rom_size, max_width, max_height, frame_serial;
+static unsigned frame_width, frame_height;
+static float display_aspect = 4.0f / 3.0f;
+static int16_t audio_buffer[AUDIO_CAPACITY];
+static size_t audio_count;
+static uint16_t *video_target;
+static bool video_updated;
+static retro_audio_buffer_status_callback_t audio_status_cb;
+static unsigned audio_occupancy;
+static bool audio_active, audio_underrun;
 
-static void throw_env(JNIEnv *env, const char *type, const char *message) {
+static void throw_java(JNIEnv *env, const char *type, const char *message) {
     jclass cls = (*env)->FindClass(env, type);
     if (cls) (*env)->ThrowNew(env, cls, message);
 }
 static void video_callback(const void *data, unsigned width, unsigned height, size_t pitch) {
-    if (!data || width == 0 || height == 0) return;
-    if (width > 1024 || height > 576) return;
-    const uint8_t *src = data;
+    if (!data || width == 0 || height == 0 || width > max_width || height > max_height) return;
+    uint16_t *destination = video_target;
+    if (!destination) return;
+    const uint8_t *source = (const uint8_t *)data;
     for (unsigned y = 0; y < height; ++y)
-        memcpy(frame + y * width, src + y * pitch, width * sizeof(uint16_t));
-    frame_width = width;
-    frame_height = height;
-    ++frame_serial;
+        memcpy(destination + (size_t)y * width, source + y * pitch, (size_t)width * 2);
+    frame_width = width; frame_height = height;
+    frame_serial++;
+    video_updated = true;
 }
-static void audio_callback(const int16_t *data, size_t frames) {
-    size_t count = frames * 2;
-    if (count > AUDIO_FRAMES * 2 - audio_count) count = AUDIO_FRAMES * 2 - audio_count;
-    if (data && count) memcpy(audio + audio_count, data, count * sizeof(int16_t));
-    audio_count += count;
-}
-static size_t audio_batch_callback(const int16_t *data, size_t frames) {
-    audio_callback(data, frames);
+static size_t audio_callback(const int16_t *data, size_t frames) {
+    size_t samples = frames * 2;
+    if (samples > AUDIO_CAPACITY) samples = AUDIO_CAPACITY;
+    if (data && samples) memcpy(audio_buffer, data, samples * sizeof(int16_t));
+    audio_count = samples;
     return frames;
 }
-static void audio_size_callback(size_t *written, size_t frames) {
-    size_t available = audio_count / 2;
-    *written = frames < available ? frames : available;
+static void audio_sample(int16_t left, int16_t right) {
+    if (audio_count + 2 <= AUDIO_CAPACITY) {
+        audio_buffer[audio_count++] = left; audio_buffer[audio_count++] = right;
+    }
 }
-static bool environment_callback(unsigned cmd, void *data) {
-    switch (cmd) {
+static void input_poll(void) { }
+static int16_t input_state(unsigned port, unsigned device, unsigned index, unsigned id) {
+    if (port != 0 || index != 0 || device != RETRO_DEVICE_JOYPAD) return 0;
+    int mask = atomic_load_explicit(&input_mask, memory_order_relaxed);
+    if (id == RETRO_DEVICE_ID_JOYPAD_MASK) return (int16_t)mask;
+    return id < 16 ? (int16_t)((mask >> id) & 1) : 0;
+}
+static const char *option_value(const char *key) {
+    if (!strcmp(key, "genesis_plus_gx_overscan"))
+        return atomic_load(&show_borders) ? "full" : "disabled";
+    if (!strcmp(key, "genesis_plus_gx_aspect_ratio")) return "auto";
+    if (!strcmp(key, "genesis_plus_gx_blargg_ntsc_filter")) return "disabled";
+    if (!strcmp(key, "genesis_plus_gx_render")) return "single field";
+    if (!strcmp(key, "genesis_plus_gx_frameskip"))
+        return atomic_load(&auto_frame_skip) ? "auto" : "disabled";
+    if (!strcmp(key, "genesis_plus_gx_frameskip_threshold")) return "33";
+    return NULL;
+}
+static bool environment(unsigned command, void *data) {
+    switch (command) {
+        case RETRO_ENVIRONMENT_GET_CAN_DUPE: *(bool *)data = true; return true;
         case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
             return *(const enum retro_pixel_format *)data == RETRO_PIXEL_FORMAT_RGB565;
-        case RETRO_ENVIRONMENT_GET_CAN_DUPE:
-            *(bool *)data = true; return true;
+        case RETRO_ENVIRONMENT_GET_INPUT_BITMASKS: return true;
         case RETRO_ENVIRONMENT_GET_VARIABLE: {
-            struct retro_variable *var = data;
-            var->value = NULL;
-            // Keep the pinned upstream defaults; video filtering belongs to the frontend.
-            return false;
+            struct retro_variable *variable = (struct retro_variable *)data;
+            const char *value = variable && variable->key ? option_value(variable->key) : NULL;
+            if (variable) variable->value = value;
+            return value != NULL;
         }
-        case RETRO_ENVIRONMENT_SET_VARIABLES:
-        case RETRO_ENVIRONMENT_SET_CORE_OPTIONS:
-        case RETRO_ENVIRONMENT_SET_CORE_OPTIONS_INTL:
-        case RETRO_ENVIRONMENT_SET_CONTROLLER_INFO:
-        case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
+        case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
+            *(bool *)data = atomic_exchange(&options_updated, false); return true;
         case RETRO_ENVIRONMENT_SET_GEOMETRY:
-        case RETRO_ENVIRONMENT_SET_ROTATION:
+        case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO: {
+            const struct retro_system_av_info *info = (const struct retro_system_av_info *)data;
+            if (info->geometry.aspect_ratio > 0) display_aspect = info->geometry.aspect_ratio;
+            if (info->geometry.max_width > max_width) max_width = info->geometry.max_width;
+            if (info->geometry.max_height > max_height) max_height = info->geometry.max_height;
             return true;
-        case RETRO_ENVIRONMENT_GET_LANGUAGE:
-            *(unsigned *)data = RETRO_LANGUAGE_ENGLISH; return true;
-        case RETRO_ENVIRONMENT_GET_LOG_INTERFACE: {
-            struct retro_log_callback *cb = data;
-            cb->log = NULL; return false;
         }
-        case RETRO_ENVIRONMENT_SHUTDOWN:
-            return false;
+        case RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK: {
+            const struct retro_audio_buffer_status_callback *callback =
+                (const struct retro_audio_buffer_status_callback *)data;
+            audio_status_cb = callback ? callback->callback : NULL;
+            return true;
+        }
+        case RETRO_ENVIRONMENT_SET_MINIMUM_AUDIO_LATENCY: return true;
+        case RETRO_ENVIRONMENT_GET_LOG_INTERFACE: {
+            struct retro_log_callback *log = (struct retro_log_callback *)data;
+            log->log = NULL; return false;
+        }
         default: return false;
     }
 }
-static int16_t input_callback(unsigned port, unsigned device, unsigned index, unsigned id) {
-    if (port != 0 || index != 0 || id >= 16 ||
-        (device != RETRO_DEVICE_JOYPAD && device != RETRO_DEVICE_NONE)) return 0;
-    unsigned mask = atomic_load_explicit(&input_mask, memory_order_relaxed);
-#ifdef SEGA_ENABLE_TEST_API
-    atomic_fetch_add(&input_queries[id], 1);
-    atomic_store(&last_mask, (int)mask);
-#endif
-    return (mask & (1u << id)) ? 1 : 0;
+JNIEXPORT void JNICALL Java_com_midoali_atari_core_SegaCore_nativeSetInput(JNIEnv *env, jclass cls, jint mask) {
+    (void)env; (void)cls; atomic_store_explicit(&input_mask, mask & 0xfff, memory_order_relaxed);
 }
-static void input_poll_callback(void) {}
-
-JNIEXPORT jboolean JNICALL Java_com_midoali_atari_core_SegaCore_nativeLoad(
-        JNIEnv *env, jclass cls, jstring rom_path, jboolean six_button) {
-    (void)cls;
-    const char *path = (*env)->GetStringUTFChars(env, rom_path, NULL);
-    if (!path) return JNI_FALSE;
+JNIEXPORT void JNICALL Java_com_midoali_atari_core_SegaCore_nativeSetSixButton(JNIEnv *env, jclass cls, jboolean enabled) {
+    (void)env; (void)cls;
     pthread_mutex_lock(&core_mutex);
-    bool ok = false;
-    if (loaded) goto done;
-    struct retro_system_info info = {0};
-    retro_get_system_info(&info);
-    LOGI("Core %s", info.library_version);
-    retro_set_environment(environment_callback);
-    retro_set_video_refresh(video_callback);
-    retro_set_audio_sample_batch(audio_batch_callback);
-    retro_set_audio_sample(NULL);
-    retro_set_input_poll(input_poll_callback);
-    retro_set_input_state(input_callback);
+    if (loaded) retro_set_controller_port_device(0,
+        enabled ? RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, 1) : RETRO_DEVICE_JOYPAD);
+    pthread_mutex_unlock(&core_mutex);
+}
+JNIEXPORT void JNICALL Java_com_midoali_atari_core_SegaCore_nativeSetPerformanceOptions(
+        JNIEnv *env, jclass cls, jboolean borders, jboolean skip) {
+    (void)env; (void)cls;
+    bool changed = atomic_load(&show_borders) != (bool)borders || atomic_load(&auto_frame_skip) != (bool)skip;
+    atomic_store(&show_borders, borders); atomic_store(&auto_frame_skip, skip);
+    if (changed) atomic_store(&options_updated, true);
+}
+JNIEXPORT jboolean JNICALL Java_com_midoali_atari_core_SegaCore_nativeLoad(JNIEnv *env, jclass cls, jstring path, jboolean sixButton) {
+    (void)cls;
+    pthread_mutex_lock(&core_mutex);
+    bool success = false;
+    const char *utf = (*env)->GetStringUTFChars(env, path, NULL);
+    if (!utf) goto done;
+    FILE *file = fopen(utf, "rb");
+    if (!file) { throw_java(env, "java/io/IOException", "Cannot open ROM"); goto release_path; }
+    if (fseek(file, 0, SEEK_END) != 0) { fclose(file); throw_java(env, "java/io/IOException", "Cannot size ROM"); goto release_path; }
+    long length = ftell(file); rewind(file);
+    if (length <= 0 || (unsigned long)length > MAX_ROM) {
+        fclose(file); throw_java(env, "java/io/IOException", "ROM must be between 1 byte and 16 MiB"); goto release_path;
+    }
+    uint8_t *data = malloc((size_t)length);
+    if (!data) { fclose(file); throw_java(env, "java/lang/OutOfMemoryError", "ROM allocation failed"); goto release_path; }
+    if (fread(data, 1, (size_t)length, file) != (size_t)length) {
+        free(data); fclose(file); throw_java(env, "java/io/IOException", "ROM read failed"); goto release_path;
+    }
+    fclose(file);
+    if (loaded) { retro_unload_game(); retro_deinit(); loaded = false; }
+    free(rom_data); rom_data = data; rom_size = (size_t)length;
+    atomic_store(&input_mask, 0);
+    retro_set_environment(environment); retro_set_video_refresh(video_callback);
+    retro_set_audio_sample_batch(audio_callback); retro_set_audio_sample(audio_sample);
+    retro_set_input_poll(input_poll); retro_set_input_state(input_state);
     retro_init();
-    initialized = true;
-    struct retro_game_info game = {0};
-    game.path = path;
+    struct retro_game_info game = {utf, rom_data, rom_size, 0};
     if (!retro_load_game(&game)) {
-        LOGE("Core rejected ROM");
-        goto done;
+        retro_deinit(); free(rom_data); rom_data = NULL; rom_size = 0;
+        throw_java(env, "java/io/IOException", "Unsupported or invalid Genesis ROM"); goto release_path;
     }
-    loaded = true;
-    struct retro_system_av_info av = {0};
-    retro_get_system_av_info(&av);
-    fps = av.timing.fps > 0 ? av.timing.fps : 60;
-    sample_rate = av.timing.sample_rate > 0 ? av.timing.sample_rate : 44100;
-    max_width = av.geometry.max_width;
-    max_height = av.geometry.max_height;
-    if (max_width > 1024 || max_height > 576) {
-        LOGE("Unsupported geometry %ux%u", max_width, max_height);
-        goto done;
+    struct retro_system_av_info info;
+    retro_get_system_av_info(&info);
+    max_width = info.geometry.max_width; max_height = info.geometry.max_height;
+    if (info.geometry.aspect_ratio > 0) display_aspect = info.geometry.aspect_ratio;
+    if (max_width > MAX_WIDTH || max_height > MAX_HEIGHT) {
+        retro_unload_game(); retro_deinit(); free(rom_data); rom_data = NULL; rom_size = 0;
+        throw_java(env, "java/io/IOException", "Core framebuffer exceeds frontend limits"); goto release_path;
     }
-    unsigned pad = RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, six_button ? 1 : 0);
-    retro_set_controller_port_device(0, pad);
-    retro_set_controller_port_device(1, RETRO_DEVICE_NONE);
-    frame_serial = 0;
-    frame_width = frame_height = 0;
-    atomic_store(&input_mask, 0);
-    ok = true;
+    retro_set_controller_port_device(0, sixButton ? RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_JOYPAD, 1) : RETRO_DEVICE_JOYPAD);
+    frame_width = info.geometry.base_width; frame_height = info.geometry.base_height;
+    frame_serial = 0; audio_count = 0; video_updated = false; audio_status_cb = NULL;
+    loaded = true; success = true;
+release_path:
+    (*env)->ReleaseStringUTFChars(env, path, utf);
 done:
-    if (!ok && initialized) {
-        if (loaded) retro_unload_game();
-        retro_deinit();
-        initialized = loaded = false;
-    }
     pthread_mutex_unlock(&core_mutex);
-    (*env)->ReleaseStringUTFChars(env, rom_path, path);
-    if (!ok) throw_env(env, "java/io/IOException", "Genesis core could not load this ROM");
-    return ok ? JNI_TRUE : JNI_FALSE;
+    return success ? JNI_TRUE : JNI_FALSE;
 }
-
-JNIEXPORT jint JNICALL Java_com_midoali_atari_core_SegaCore_nativeRun(
-        JNIEnv *env, jclass cls, jshortArray output_audio, jobject output_video, jintArray metadata) {
+JNIEXPORT jint JNICALL Java_com_midoali_atari_core_SegaCore_nativeRun(JNIEnv *env, jclass cls,
+        jshortArray audio, jobject video, jintArray metadata) {
     (void)cls;
     pthread_mutex_lock(&core_mutex);
-    jint written = -1;
-    if (!loaded) goto done;
-    jshort *audio_out = (*env)->GetShortArrayElements(env, output_audio, NULL);
-    uint8_t *video_out = (*env)->GetDirectBufferAddress(env, output_video);
-    jint *meta = (*env)->GetIntArrayElements(env, metadata, NULL);
-    jsize audio_capacity = (*env)->GetArrayLength(env, output_audio);
-    jlong video_capacity = (*env)->GetDirectBufferCapacity(env, output_video);
-    if (!audio_out || !video_out || !meta || (*env)->GetArrayLength(env, metadata) < 5 ||
-        video_capacity < (jlong)max_width * max_height * 2 || audio_capacity < AUDIO_FRAMES * 2) {
-        if (audio_out) (*env)->ReleaseShortArrayElements(env, output_audio, audio_out, JNI_ABORT);
-        if (meta) (*env)->ReleaseIntArrayElements(env, metadata, meta, JNI_ABORT);
-        pthread_mutex_unlock(&core_mutex);
-        throw_env(env, "java/lang/IllegalArgumentException", "Invalid emulator output buffers");
-        return -1;
-    }
-    audio_count = 0;
+    jint result = -1;
+    if (!loaded || !audio || !video || !metadata || (*env)->GetArrayLength(env, audio) < AUDIO_CAPACITY ||
+        (*env)->GetArrayLength(env, metadata) < 7 ||
+        (*env)->GetDirectBufferCapacity(env, video) < MAX_WIDTH * MAX_HEIGHT * 2) goto done;
+    uint16_t *pixels = (uint16_t *)(*env)->GetDirectBufferAddress(env, video);
+    if (!pixels) goto done;
+    video_target = pixels; video_updated = false; audio_count = 0;
+    if (audio_status_cb) audio_status_cb(audio_active, audio_occupancy, audio_underrun);
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
     retro_run();
-    size_t count = audio_count;
-    memcpy(audio_out, audio, count * sizeof(int16_t));
-    size_t video_bytes = (size_t)frame_width * frame_height * 2;
-    if (video_bytes) memcpy(video_out, frame, video_bytes);
-    meta[0] = (jint)frame_width;
-    meta[1] = (jint)frame_height;
-    meta[2] = (jint)(frame_serial & 0x7fffffff);
-    meta[3] = (jint)count;
-    meta[4] = (jint)(atomic_load(&input_mask));
-    written = (jint)(count / 2);
-    (*env)->ReleaseShortArrayElements(env, output_audio, audio_out, 0);
-    (*env)->ReleaseIntArrayElements(env, metadata, meta, 0);
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    video_target = NULL;
+    long long micros = (long long)(end.tv_sec - start.tv_sec) * 1000000LL + (end.tv_nsec - start.tv_nsec) / 1000;
+    // Region copies avoid pinning/copying the entire capacity on every frame.
+    if (audio_count) (*env)->SetShortArrayRegion(env, audio, 0, (jsize)audio_count, audio_buffer);
+    uint32_t aspect_bits; memcpy(&aspect_bits, &display_aspect, sizeof(aspect_bits));
+    jint values[7] = {(jint)frame_width, (jint)frame_height, (jint)frame_serial,
+                      (jint)max_width, (jint)max_height, (jint)aspect_bits, (jint)micros};
+    (*env)->SetIntArrayRegion(env, metadata, 0, 7, values);
+    result = (jint)audio_count / 2;
 done:
     pthread_mutex_unlock(&core_mutex);
-    return written;
+    return result;
 }
-
-JNIEXPORT void JNICALL Java_com_midoali_atari_core_SegaCore_nativeSetInput(
-        JNIEnv *env, jclass cls, jint mask) {
+JNIEXPORT void JNICALL Java_com_midoali_atari_core_SegaCore_nativeSetAudioStatus(JNIEnv *env, jclass cls,
+        jint occupancy, jboolean active, jboolean underrun) {
     (void)env; (void)cls;
-    atomic_store_explicit(&input_mask, (unsigned)mask & 0xffff, memory_order_relaxed);
-}
-JNIEXPORT void JNICALL Java_com_midoali_atari_core_SegaCore_nativeClose(JNIEnv *env, jclass cls) {
-    (void)env; (void)cls;
-    pthread_mutex_lock(&core_mutex);
-    atomic_store(&input_mask, 0);
-    if (loaded) retro_unload_game();
-    if (initialized) retro_deinit();
-    loaded = initialized = false;
-    pthread_mutex_unlock(&core_mutex);
-}
-JNIEXPORT jdouble JNICALL Java_com_midoali_atari_core_SegaCore_nativeFps(JNIEnv *env, jclass cls) {
-    (void)env; (void)cls; return fps;
+    audio_occupancy = occupancy < 0 ? 0 : (occupancy > 100 ? 100 : (unsigned)occupancy);
+    audio_active = active; audio_underrun = underrun;
 }
 JNIEXPORT jint JNICALL Java_com_midoali_atari_core_SegaCore_nativeSampleRate(JNIEnv *env, jclass cls) {
-    (void)env; (void)cls; return (jint)sample_rate;
+    (void)env; (void)cls; pthread_mutex_lock(&core_mutex);
+    struct retro_system_av_info info; jint rate = 44100;
+    if (loaded) { retro_get_system_av_info(&info); rate = (jint)info.timing.sample_rate; }
+    pthread_mutex_unlock(&core_mutex); return rate;
+}
+JNIEXPORT jdouble JNICALL Java_com_midoali_atari_core_SegaCore_nativeFps(JNIEnv *env, jclass cls) {
+    (void)env; (void)cls; pthread_mutex_lock(&core_mutex);
+    struct retro_system_av_info info; jdouble fps = 60;
+    if (loaded) { retro_get_system_av_info(&info); fps = info.timing.fps; }
+    pthread_mutex_unlock(&core_mutex); return fps;
+}
+JNIEXPORT void JNICALL Java_com_midoali_atari_core_SegaCore_nativeReset(JNIEnv *env, jclass cls) {
+    (void)env; (void)cls; pthread_mutex_lock(&core_mutex);
+    if (loaded) retro_reset(); atomic_store(&input_mask, 0); pthread_mutex_unlock(&core_mutex);
 }
 JNIEXPORT jint JNICALL Java_com_midoali_atari_core_SegaCore_nativeSaveSize(JNIEnv *env, jclass cls) {
-    (void)env; (void)cls;
-    pthread_mutex_lock(&core_mutex);
-    size_t size = loaded ? retro_get_memory_size(RETRO_MEMORY_SAVE_RAM) : 0;
-    pthread_mutex_unlock(&core_mutex);
-    return (jint)size;
+    (void)env; (void)cls; pthread_mutex_lock(&core_mutex);
+    jint size = loaded ? (jint)retro_get_memory_size(RETRO_MEMORY_SAVE_RAM) : 0;
+    pthread_mutex_unlock(&core_mutex); return size;
 }
-JNIEXPORT jboolean JNICALL Java_com_midoali_atari_core_SegaCore_nativePersistSave(
-        JNIEnv *env, jclass cls, jstring save_path, jboolean restore) {
-    (void)cls;
-    const char *path = (*env)->GetStringUTFChars(env, save_path, NULL);
-    if (!path) return JNI_FALSE;
-    pthread_mutex_lock(&core_mutex);
-    bool ok = false;
-    void *data = loaded ? retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) : NULL;
+JNIEXPORT jboolean JNICALL Java_com_midoali_atari_core_SegaCore_nativePersistSave(JNIEnv *env, jclass cls, jstring path, jboolean restore) {
+    (void)cls; pthread_mutex_lock(&core_mutex);
+    bool success = false;
     size_t size = loaded ? retro_get_memory_size(RETRO_MEMORY_SAVE_RAM) : 0;
-    if (data && size > 0 && size <= 1024 * 1024) {
-        FILE *file = fopen(path, restore ? "rb" : "wb");
-        if (file) {
-            ok = restore ? fread(data, 1, size, file) == size : fwrite(data, 1, size, file) == size;
-            if (fclose(file) != 0) ok = false;
-        }
+    void *memory = loaded ? retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) : NULL;
+    if (!size || !memory) goto done;
+    const char *utf = (*env)->GetStringUTFChars(env, path, NULL);
+    if (!utf) goto done;
+    FILE *file = fopen(utf, restore ? "rb" : "wb");
+    if (file) {
+        success = restore ? fread(memory, 1, size, file) == size : fwrite(memory, 1, size, file) == size;
+        fclose(file);
     }
+    (*env)->ReleaseStringUTFChars(env, path, utf);
+done:
+    pthread_mutex_unlock(&core_mutex); return success ? JNI_TRUE : JNI_FALSE;
+}
+JNIEXPORT void JNICALL Java_com_midoali_atari_core_SegaCore_nativeClose(JNIEnv *env, jclass cls) {
+    (void)env; (void)cls; pthread_mutex_lock(&core_mutex);
+    if (loaded) { retro_unload_game(); retro_deinit(); loaded = false; }
+    free(rom_data); rom_data = NULL; rom_size = 0; atomic_store(&input_mask, 0);
+    audio_status_cb = NULL; video_target = NULL;
     pthread_mutex_unlock(&core_mutex);
-    (*env)->ReleaseStringUTFChars(env, save_path, path);
-    return ok ? JNI_TRUE : JNI_FALSE;
 }
-JNIEXPORT jint JNICALL Java_com_midoali_atari_core_SegaCore_nativeTestInput(
-        JNIEnv *env, jclass cls, jint id) {
-    (void)env; (void)cls; (void)id;
-#ifdef SEGA_ENABLE_TEST_API
-    if (id == -1) return atomic_load(&last_mask);
-    if (id >= 0 && id < 16) return (jint)atomic_load(&input_queries[id]);
-#endif
-    return -1;
+#ifdef SEGA_TEST_API
+JNIEXPORT jint JNICALL Java_com_midoali_atari_core_SegaCore_nativeTestInput(JNIEnv *env, jclass cls, jint id) {
+    (void)env; (void)cls;
+    if (id < 0) return atomic_load_explicit(&input_mask, memory_order_relaxed);
+    return input_state(0, RETRO_DEVICE_JOYPAD, 0, (unsigned)id);
 }
-JNIEXPORT jbyteArray JNICALL Java_com_midoali_atari_core_SegaCore_nativeTestRam(
-        JNIEnv *env, jclass cls, jint offset, jint length) {
-    (void)cls;
-#ifdef SEGA_ENABLE_TEST_API
-    pthread_mutex_lock(&core_mutex);
-    uint8_t *ram = loaded ? retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM) : NULL;
-    size_t size = loaded ? retro_get_memory_size(RETRO_MEMORY_SYSTEM_RAM) : 0;
+JNIEXPORT jbyteArray JNICALL Java_com_midoali_atari_core_SegaCore_nativeTestRam(JNIEnv *env, jclass cls, jint offset, jint length) {
+    (void)cls; pthread_mutex_lock(&core_mutex);
     jbyteArray result = NULL;
-    if (ram && offset >= 0 && length > 0 && length <= 65536 && (size_t)offset + length <= size) {
+    uint8_t *ram = loaded ? (uint8_t *)retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM) : NULL;
+    size_t size = loaded ? retro_get_memory_size(RETRO_MEMORY_SYSTEM_RAM) : 0;
+    if (ram && offset >= 0 && length > 0 && (size_t)offset + (size_t)length <= size) {
         result = (*env)->NewByteArray(env, length);
         if (result) (*env)->SetByteArrayRegion(env, result, 0, length, (const jbyte *)(ram + offset));
     }
-    pthread_mutex_unlock(&core_mutex);
-    return result;
-#else
-    (void)env; (void)offset; (void)length; return NULL;
-#endif
+    pthread_mutex_unlock(&core_mutex); return result;
 }
+#endif

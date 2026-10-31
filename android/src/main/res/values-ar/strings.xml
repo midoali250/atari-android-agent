@@ -11,10 +11,26 @@
     <string name="invalid_genesis_rom">الملف ليس لعبة Genesis خام مدعومة. ملفات ZIP وصور Sega CD غير مدعومة.</string>
     <string name="emulator_error">تعذّر تشغيل اللعبة: %1$s</string>
     <string name="bilinear_filter">تنعيم الحواف Bilinear</string><string name="haptics">اهتزاز عند اللمس</string>
+    <string name="six_button">يد سيجا 6 أزرار (X/Y/Z + A/B/C)</string>
+    <string name="video_quality">جودة الصورة</string>
+    <string name="display_mode">ملاءمة الشاشة</string>
+    <string name="show_borders">إظهار حدود الشاشة الأصلية (إلغاء قص الحواف)</string>
+    <string name="auto_frame_skip">تخطي إطارات تلقائي على الأجهزة البطيئة</string>
+    <string name="perf_readout">المحاكاة: %1$.1f إطار/ث | النواة: %2$.2f مللي ث/إطار | %3$d×%4$d | انقطاع الصوت: %5$d</string>
+    <string name="toolbar_hint">اضغط على الحافة العلوية للشاشة لإظهار القائمة أو إخفائها.</string>
+    <string-array name="video_quality_modes">
+        <item>البكسل الأصلي</item>
+        <item>ناعم (Bilinear)</item>
+        <item>محسّن (Bicubic)</item>
+    </string-array>
+    <string-array name="display_modes">
+        <item>الصورة كاملة بدون قص</item>
+        <item>ملء الشاشة بالتمدد بدون قص</item>
+    </string-array>
     <string name="mute">كتم الصوت</string><string name="control_size">حجم أزرار التحكم</string><string name="control_opacity">شفافية أزرار التحكم</string>
     <string name="edit_layout">تحريك الأزرار على الشاشة</string><string name="reset_layout">استعادة مواضع وحجم الأزرار</string>
-    <string name="finish_layout">حفظ المواضع</string><string name="drag_controls">اسحب الاتجاهات أو A/B/C أو START، ثم احفظ.</string>
-    <string name="settings_explanation">تتوقف اللعبة أثناء ترتيب الأزرار ولا تُرسل لمساتEditMode مدخلات. تُحفظ المواضع والحجم والشفافية والتناعم تلقائيًا. ربط أزرار سيجا داخل النواة: A→Y وB→B وC→A.</string>
-    <string name="touch_controls_description">أزرار سيجا اللمسية: الاتجاهات وA وB وC وStart</string>
-<string name="third_party_notices">التراخيص وتنبيه الاستخدام غير التجاري</string>
+    <string name="finish_layout">حفظ المواضع</string><string name="drag_controls">اسحب الاتجاهات أو X/Y/Z/A/B/C أو START، ثم احفظ.</string>
+    <string name="settings_explanation">أثناء الترتيب تتوقف اللعبة ولا تُرسل اللمسات مدخلات. تُحفظ المواضع والحجم والشفافية وخيارات الصورة تلقائيًا. ربط 6 أزرار: A→Y وB→B وC→A وX→L وY→X وZ→R.</string>
+    <string name="touch_controls_description">أزرار سيجا اللمسية: الاتجاهات وX وY وZ وA وB وC وStart</string>
+    <string name="third_party_notices">التراخيص وتنبيه الاستخدام غير التجاري</string>
 </resources>

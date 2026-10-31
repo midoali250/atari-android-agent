@@ -12,10 +12,26 @@
     <string name="invalid_genesis_rom">This is not a supported raw Genesis ROM. ZIP files and Sega CD images are not supported.</string>
     <string name="emulator_error">Could not start the game: %1$s</string>
     <string name="bilinear_filter">Bilinear filtering (smoother image)</string><string name="haptics">Touch vibration</string>
+    <string name="six_button">Six-button Sega pad (X/Y/Z + A/B/C)</string>
+    <string name="video_quality">Image quality</string>
+    <string name="display_mode">Screen fit</string>
+    <string name="show_borders">Show console borders (disable overscan crop)</string>
+    <string name="auto_frame_skip">Auto frame skip on slow devices</string>
+    <string name="perf_readout">Emulation: %1$.1f fps | core: %2$.2f ms/frame | %3$d×%4$d | audio underruns: %5$d</string>
+    <string name="toolbar_hint">Tap the top edge of the screen to show or hide the menu.</string>
+    <string-array name="video_quality_modes">
+        <item>Original pixels</item>
+        <item>Smooth (bilinear)</item>
+        <item>Enhanced (bicubic)</item>
+    </string-array>
+    <string-array name="display_modes">
+        <item>Fit full image (no crop)</item>
+        <item>Fill screen (stretch, no crop)</item>
+    </string-array>
     <string name="mute">Mute audio</string><string name="control_size">Control size</string><string name="control_opacity">Control opacity</string>
     <string name="edit_layout">Move controls on screen</string><string name="reset_layout">Reset layout and size</string>
-    <string name="finish_layout">Save layout</string><string name="drag_controls">Drag D-pad, A/B/C or START. Then save.</string>
-    <string name="settings_explanation">While editing, the game is paused and touches do not send input. Layout, size, opacity and filtering are saved automatically. Genesis mapping: A→Y, B→B, C→A in the libretro core.</string>
-    <string name="touch_controls_description">Genesis touch controls: directional pad, A, B, C and Start</string>
-<string name="third_party_notices">Licenses / non-commercial notice</string>
+    <string name="finish_layout">Save layout</string><string name="drag_controls">Drag D-pad, X/Y/Z/A/B/C or START. Then save.</string>
+    <string name="settings_explanation">While editing, the game is paused and touches do not send input. Layout, size, opacity and video options are saved automatically. Six-button mapping: A→Y, B→B, C→A, X→L, Y→X, Z→R.</string>
+    <string name="touch_controls_description">Genesis touch controls: directional pad, X, Y, Z, A, B, C and Start</string>
+    <string name="third_party_notices">Licenses / non-commercial notice</string>
 </resources>

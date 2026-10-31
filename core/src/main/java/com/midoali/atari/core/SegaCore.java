@@ -9,7 +9,10 @@ public final class SegaCore {
     private SegaCore() {}
 
     public static native boolean nativeLoad(String path, boolean sixButton) throws IOException;
-    /** Returns stereo frame count; metadata: width, height, serial, samples, sampled input. */
+    public static native void nativeSetSixButton(boolean enabled);
+    public static native void nativeSetPerformanceOptions(boolean showBorders, boolean autoFrameSkip);
+    public static native void nativeSetAudioStatus(int occupancy, boolean active, boolean underrun);
+    /** Returns stereo frame count; metadata: width, height, serial, maxWidth, maxHeight, aspectBits, coreMicros. */
     public static native int nativeRun(short[] audio, ByteBuffer video, int[] metadata);
     public static native void nativeSetInput(int mask);
     public static native void nativeClose();
@@ -17,6 +20,8 @@ public final class SegaCore {
     public static native int nativeSampleRate();
     public static native int nativeSaveSize();
     public static native boolean nativePersistSave(String path, boolean restore);
+    public static native void nativeReset();
+    // Test-only APIs are compiled only when SEGA_TEST_API is enabled.
     public static native int nativeTestInput(int id);
     public static native byte[] nativeTestRam(int offset, int length);
 }

@@ -42,8 +42,8 @@ android {
         manifestPlaceholders["appLabel"] = gameLabel
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.4.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
         externalNativeBuild { cmake { arguments += "-DANDROID_STL=none" } }
@@ -81,6 +81,7 @@ android {
             // AGP supplies the local Android debug signing configuration.
         }
         release {
+            versionNameSuffix = if (personalGame) "-umk3" else ""
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

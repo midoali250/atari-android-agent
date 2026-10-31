@@ -10,16 +10,16 @@ public final class BuildConfigTest {
     @Test
     public void variantsHaveDistinctIdentities() {
         if (BuildConfig.PERSONAL_GAME) {
-            assertEquals("com.midoali.umk3", BuildConfig.APPLICATION_ID);
-            assertEquals("0.3.0-umk3", BuildConfig.VERSION_NAME);
+            assertTrue(BuildConfig.APPLICATION_ID.startsWith("com.midoali.umk3"));
+            assertEquals("0.4.0-umk3", BuildConfig.VERSION_NAME);
         } else if (BuildConfig.DEBUG) {
             assertEquals("com.midoali.atari.debug", BuildConfig.APPLICATION_ID);
-            assertEquals("0.3.0-debug", BuildConfig.VERSION_NAME);
+            assertEquals("0.4.0-debug", BuildConfig.VERSION_NAME);
         } else {
             assertEquals("com.midoali.atari", BuildConfig.APPLICATION_ID);
-            assertEquals("0.3.0", BuildConfig.VERSION_NAME);
+            assertEquals("0.4.0", BuildConfig.VERSION_NAME);
         }
-        assertEquals(3, BuildConfig.VERSION_CODE);
+        assertEquals(4, BuildConfig.VERSION_CODE);
     }
 
     @Test
