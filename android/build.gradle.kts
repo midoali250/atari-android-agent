@@ -5,6 +5,10 @@ plugins {
 }
 
 // Release signing is opt-in. Never put credentials or keystores in this repository.
+val personalGame = providers.gradleProperty("personalGame").orElse("false").get().toBoolean()
+val gameApplicationId = providers.gradleProperty("gameApplicationId").orElse("com.midoali.atari").get()
+val gameLabel = providers.gradleProperty("gameLabel").orElse("@string/app_name").get()
+
 val signingEnvironmentNames = listOf(
     "ATARI_KEYSTORE_PATH",
     "ATARI_KEYSTORE_PASSWORD",
@@ -34,14 +38,16 @@ android {
     buildToolsVersion = "35.0.0"
 
     defaultConfig {
-        applicationId = "com.midoali.atari"
+        applicationId = gameApplicationId
+        manifestPlaceholders["appLabel"] = gameLabel
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
         externalNativeBuild { cmake { arguments += "-DANDROID_STL=none" } }
+        buildConfigField("boolean", "PERSONAL_GAME", personalGame.toString())
     }
 
     externalNativeBuild {
@@ -70,8 +76,8 @@ android {
         debug {
             ndk { abiFilters += "x86" } // Instrumentation on the 32-bit emulator.
             externalNativeBuild { cmake { arguments += "-DSEGA_TEST_API=ON" } }
-            applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
+            applicationIdSuffix = if (personalGame) "" else ".debug"
+            versionNameSuffix = if (personalGame) "-umk3" else "-debug"
             // AGP supplies the local Android debug signing configuration.
         }
         release {
@@ -109,6 +115,7 @@ android {
                 include("*")
                 exclude { element ->
                     !element.file.isFile ||
+                        element.file.name.equals("README.md", ignoreCase = true) ||
                         element.file.extension.lowercase() !in setOf("a26", "bin", "a78", "md", "gen", "smd")
                 }
             }

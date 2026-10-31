@@ -27,3 +27,8 @@ artifacts/
 # Local debugging artifacts
 *.hprof
 captures/
+
+# Local/private ROMs are packaged only into explicitly requested personal APKs.
+roms/*
+!roms/.gitkeep
+!roms/README.md

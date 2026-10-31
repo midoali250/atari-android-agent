@@ -9,20 +9,27 @@ import org.junit.Test;
 public final class BuildConfigTest {
     @Test
     public void variantsHaveDistinctIdentities() {
-        if (BuildConfig.DEBUG) {
+        if (BuildConfig.PERSONAL_GAME) {
+            assertEquals("com.midoali.umk3", BuildConfig.APPLICATION_ID);
+            assertEquals("0.3.0-umk3", BuildConfig.VERSION_NAME);
+        } else if (BuildConfig.DEBUG) {
             assertEquals("com.midoali.atari.debug", BuildConfig.APPLICATION_ID);
-            assertEquals("0.2.0-debug", BuildConfig.VERSION_NAME);
+            assertEquals("0.3.0-debug", BuildConfig.VERSION_NAME);
         } else {
             assertEquals("com.midoali.atari", BuildConfig.APPLICATION_ID);
-            assertEquals("0.2.0", BuildConfig.VERSION_NAME);
+            assertEquals("0.3.0", BuildConfig.VERSION_NAME);
         }
-        assertEquals(2, BuildConfig.VERSION_CODE);
+        assertEquals(3, BuildConfig.VERSION_CODE);
     }
 
     @Test
     public void buildTypeFlagMatchesPackageName() {
-        assertTrue(BuildConfig.APPLICATION_ID.startsWith("com.midoali.atari"));
-        assertEquals(BuildConfig.DEBUG, BuildConfig.APPLICATION_ID.endsWith(".debug"));
+        assertTrue(BuildConfig.APPLICATION_ID.startsWith("com.midoali."));
+        if (BuildConfig.PERSONAL_GAME) {
+            assertFalse(BuildConfig.APPLICATION_ID.endsWith(".debug"));
+        } else {
+            assertEquals(BuildConfig.DEBUG, BuildConfig.APPLICATION_ID.endsWith(".debug"));
+        }
         assertFalse(BuildConfig.VERSION_NAME.isEmpty());
     }
 }

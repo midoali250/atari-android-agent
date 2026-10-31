@@ -44,6 +44,7 @@ public final class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         settingsStore = new SettingsStore(this); layout = settingsStore.load();
+        String bundledAsset = findBundledRomAsset();
         FrameLayout root = new FrameLayout(this); root.setBackgroundColor(Color.rgb(7,9,14));
         surface = new GLSurfaceView(this); surface.setEGLContextClientVersion(2);
         surface.setEGLConfigChooser(5,6,5,0,0,0);
@@ -54,7 +55,7 @@ public final class MainActivity extends Activity {
         root.addView(controls,new FrameLayout.LayoutParams(-1,-1));
         LinearLayout toolbar = new LinearLayout(this); toolbar.setGravity(Gravity.CENTER_VERTICAL);
         toolbar.setPadding(dp(12),dp(5),dp(12),dp(5)); toolbar.setBackgroundColor(0xb0101820);
-        toolbar.addView(toolbarButton(R.string.import_rom,v->chooseRom()));
+        if (bundledAsset == null) toolbar.addView(toolbarButton(R.string.import_rom,v->chooseRom()));
         pauseButton=toolbarButton(R.string.pause,v->{ userPaused=!userPaused; syncPause(); }); toolbar.addView(pauseButton);
         toolbar.addView(toolbarButton(R.string.settings,v->showSettings()));
         toolbar.addView(toolbarButton(R.string.reset_game,v->confirmReset()));
@@ -72,10 +73,44 @@ public final class MainActivity extends Activity {
         hideSystemBars();
         String testPath=BuildConfig.DEBUG ? getIntent().getStringExtra(EXTRA_TEST_ROM) : null;
         if(testPath!=null) loadRom(new File(testPath));
+        else if(bundledAsset!=null) loadBundledRom(bundledAsset);
         else {
             String saved=settingsStore.preferences().getString("lastRom",null);
             if(saved!=null && new File(saved).isFile()) loadRom(new File(saved));
         }
+    }
+    private String findBundledRomAsset() {
+        try {
+            String[] names=getAssets().list("roms");
+            if(names==null)return null;
+            java.util.Arrays.sort(names);
+            for(String name:names){
+                if(name.equalsIgnoreCase("README.md"))continue;
+                String lower=name.toLowerCase(java.util.Locale.ROOT);
+                if(lower.endsWith(".md")||lower.endsWith(".gen")||lower.endsWith(".bin")||lower.endsWith(".smd")) return "roms/"+name;
+            }
+        } catch(Exception ignored) { }
+        return null;
+    }
+    private void loadBundledRom(String asset) {
+        loading=true;status.setVisibility(View.VISIBLE);status.setText(R.string.loading_rom);controls.setInteractive(false);
+        io.execute(()->{
+            File temporary=new File(getFilesDir(),"bundled.tmp");
+            try(InputStream input=getAssets().open(asset);FileOutputStream output=new FileOutputStream(temporary)) {
+                byte[] buffer=new byte[65536];int count;long total=0;
+                while((count=input.read(buffer))!=-1){total+=count;if(total>16*1024*1024)throw new IllegalStateException(getString(R.string.rom_too_large));output.write(buffer,0,count);}
+                output.getFD().sync();
+                if(destroyed)return;
+                if(!RomValidator.isGenesis(temporary))throw new IllegalStateException(getString(R.string.invalid_genesis_rom));
+                File destination=new File(getFilesDir(),"current.gen");
+                if(temporary.length()!=destination.length() || !RomValidator.sameBytes(temporary,destination)) {
+                    if(destination.exists() && !destination.delete())throw new IllegalStateException("Could not replace ROM");
+                    if(!temporary.renameTo(destination))throw new IllegalStateException("Could not save ROM");
+                }
+                runOnUiThread(()->{if(!destroyed){loading=false;loadRom(destination);}});
+            }catch(Exception exception){runOnUiThread(()->{if(!destroyed){loading=false;showError(exception.getMessage());syncPause();}});}
+            finally{temporary.delete();}
+        });
     }
     private Button toolbarButton(int text,View.OnClickListener listener) {
         Button button=new Button(this);button.setAllCaps(false);button.setText(text);button.setTextSize(12);
