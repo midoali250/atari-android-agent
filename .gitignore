@@ -1,0 +1,22 @@
+# OS / editor files
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+.cxx/
+
+# Signing keys and local credentials
+*.jks
+*.keystore
+.env
+.env.*
+!.env.example
+
+# Local debugging artifacts
+*.hprof
+captures/
