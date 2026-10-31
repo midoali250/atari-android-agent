@@ -1,0 +1,8 @@
+{
+  "name": "Genesis Plus GX",
+  "repository": "https://github.com/libretro/genesis-plus-gx",
+  "commit": "f27655b592ef43f317272d79883bcaa10d3ac8ad",
+  "modifications": "None; unmodified upstream core and libretro directories",
+  "scope": "Mega Drive / Genesis cartridge emulation; Sega CD and CHD disabled in this frontend",
+  "license": "See LICENSE.txt; non-commercial redistribution only"
+}

@@ -1,0 +1,2 @@
+# Preserve upstream Genesis Plus GX bytes, including original line endings.
+genesis-plus-gx/** -text

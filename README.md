@@ -1,12 +1,22 @@
-# Atari Android Agent
+# Atari Android Agent — Sega Genesis
 
-مشروع أندرويد لألعاب Atari، مع منظومة بناء وتصدير APK وتكامل مستمر عبر GitHub Actions.
+تطبيق أندرويد يشغّل ألعاب **Sega Genesis / Mega Drive** عبر محرك Genesis Plus GX، مع عرض OpenGL ES، وتحكم لمسي متعدد النقاط، وإعدادات قابلة للتخصيص، وحفظ SRAM.
 
-> **الحالة الحالية:** يوجد تطبيق مبدئي قابل للبناء والتثبيت للتحقق من التغليف، لكن **لا يوجد محرك محاكاة أو لعبة قابلة للعب بعد**. لا تُضمَّن ملفات ROM افتراضيًا.
+> **مهم:** لا تُضمَّن أي لعبة أو ROM داخل APK أو المستودع. استورد ملفًا تملك حق استخدامه من داخل التطبيق. المحرك مدمج تحت ترخيص Genesis Plus GX غير التجاري؛ راجع `THIRD_PARTY_NOTICES.txt` قبل أي توزيع.
+
+## ما الذي يعمل الآن؟
+
+- محاكاة Genesis فعلية عبر Genesis Plus GX، مع صوت وفيديو وSRAM.
+- **Bilinear Filtering** لتنعيم الحواف، مفعّل افتراضيًا ويمكن إيقافه من الإعدادات.
+- أزرار لمسية بشكل **D-pad + A/B/C + START**، متصلة فعليًا بمدخلات المحرك، مع دعم الضغط المتزامن (مثل يمين + B).
+- تحريك مجموعات التحكم وتغيير الحجم والشفافية من الإعدادات، وحفظLayout تلقائيًا.
+- استيراد ROM عبر Android Storage Access Framework، وإيقاف/استئناف، وإعادة ضبط اللعبة.
+- حفظ تلقائي لـ SRAM لكل لعبة، واستعادته عند فتحها مجددًا.
+- إشعارات التراخيص داخل التطبيق.
 
 ## بناء APK بأمر واحد
 
-المتطلبات: **JDK 17**، **Android SDK Platform 35** و**Build Tools 35.0.0**. اضبط `ANDROID_HOME` أو `local.properties` المحلي. لا تحتاج إلى تثبيت Gradle عالميًا.
+المتطلبات: **JDK 17**، **Android SDK Platform 35**، **Build Tools 35.0.0**، **NDK 27.0.12077973**، و**CMake 3.22.1**. اضبط `ANDROID_HOME` أو `local.properties`. لا تحتاج إلى Gradle عالميًا.
 
 Linux / macOS:
 
@@ -24,82 +34,72 @@ scripts\build-apk.bat debug
 
 ```bash
 ./gradlew :android:exportDebugApk
-# Windows: gradlew.bat :android:exportDebugApk
 ```
 
-**الناتج القابل للتثبيت يدويًا:**
+**الناتج القابل للتثبيت:**
 
 ```text
-artifacts/apk/atari-android-debug.apk
+artifacts/apk/sega-android-debug.apk
 ```
 
-النسخة موقّعة بمفتاح debug. للتثبيت على جهاز متصل بعد تفعيل USB debugging:
+التثبيت على جهاز متصل:
 
 ```bash
-adb install -r artifacts/apk/atari-android-debug.apk
+adb install -r artifacts/apk/sega-android-debug.apk
 ```
 
-دليل البيئة، التوقيع، إصدار release، تضمين ROM الاختياري، وتنزيل APK من GitHub Actions موجود في **[دليل بناء وتصدير APK](docs/BUILD_APK.md)**. نتائج الفحص المحلي وحدوده موثقة في **[سجل التحقق](docs/VERIFICATION.md)**.
+النسخة موقّعة بمفتاح debug. التفاصيل في **[دليل البناء](docs/BUILD_APK.md)**، ونتائج الاختبار الفعلية في **[سجل التحقق](docs/VERIFICATION.md)**.
 
 ## هيكل المشروع
 
 ```text
 atari-android-agent/
-├── android/                     # تطبيق Android وGradle module
-│   ├── build.gradle.kts
-│   ├── proguard-rules.pro
-│   └── src/
-│       ├── main/                # Activity وموارد الواجهة
-│       └── test/                # اختبارات هوية نسخة البناء
-├── core/                        # وحدة Java مستقلة؛ ليست محرك محاكاة بعد
-│   ├── build.gradle.kts
-│   └── src/
-├── roms/                        # ملفات مصرّح بتوزيعها؛ لا تُضمَّن افتراضيًا
-├── scripts/
-│   ├── build-apk.sh
-│   └── build-apk.bat
-├── docs/BUILD_APK.md
-├── .github/workflows/
-│   ├── android-apk.yml          # بناء واختبار وتصدير debug APK
-│   └── android-release.yml      # إصدار موقّع يدوي عند ضبط الأسرار
-├── artifacts/apk/               # ناتج محلي مستثنى من Git
-├── gradle/wrapper/              # Gradle 8.11.1 مثبت البصمة
-├── build.gradle.kts             # Android Gradle Plugin 8.9.2
-├── settings.gradle.kts
-├── gradle.properties
-├── gradlew
-└── gradlew.bat
+├── android/                     # تطبيق Android: Activity، العرض، التحكم، الإعدادات
+├── core/                        # JNI + Genesis Plus GX + منطق التحكم والاختبارات
+│   └── src/main/cpp/genesis-plus-gx/
+├── roms/                        # ملفات مصرّح بتوزيعها فقط؛ لا تُضمَّن افتراضيًا
+├── scripts/                     # بناء وتصدير APK
+├── docs/                        # البناء والتحقق
+├── tests/                       # اختبار native smoke على المضيف
+├── .github/workflows/           # بناء debug وإصدار release موقّع يدوي
+├── THIRD_PARTY_NOTICES.txt      # تراخيص المحرك والمكونات
+└── gradle/wrapper/              # Gradle 8.11.1 مثبت البصمة
 ```
-
-افتح **جذر المستودع** في Android Studio ليظهر مشروعا `:android` و`:core` معًا.
 
 ## أوامر التحقق
 
 ```bash
 ./gradlew :core:test :android:testDebugUnitTest :android:lintDebug
-./gradlew clean :android:exportDebugApk
+./gradlew :android:exportDebugApk
 ```
 
-يصدر المسار `artifacts/apk/` ملفًا باسم ثابت، ويُستثنى من Git. يرفع GitHub Actions ملف APK وبصمة SHA-256 في Artifacts بعد نجاح الاختبارات وفحص التوقيع والمحاذاة.
+اختبار اللمس الفعلي على محاكي (يتطلب ROM محليًا ولا يوزّعها):
+
+```bash
+adb install -r android/build/outputs/apk/debug/sega-android-debug.apk
+adb install -r android/build/outputs/apk/androidTest/debug/sega-android-debug-androidTest.apk
+adb push /path/to/game.gen /data/local/tmp/sega-test/game.gen
+adb shell am instrument -w -r \
+  -e class com.midoali.atari.ControlsInstrumentedTest \
+  -e rom /data/local/tmp/sega-test/game.gen \
+  com.midoali.atari.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+أضف `-e screenshots true` لالتقاط صور داخل التطبيق أثناء الاختبار.
 
 ## حالة التنفيذ
 
-- [x] إنشاء المجلدات الأساسية والتوثيق.
-- [x] إعداد Gradle Wrapper وتطبيق أندرويد مبدئي ووحدة Java مستقلة.
-- [x] بناء APK تطوير موقّع وتصديره بأمر واحد.
-- [x] إعداد توقيع release اختياري دون وضع مفاتيح في المستودع.
-- [x] تضمين ROM اختياري، مغلق افتراضيًا.
-- [x] إعداد مسارات بناء وتصدير عبر GitHub Actions.
-- [ ] اختيار أول لعبة ونظام Atari المستهدف.
-- [ ] تنفيذ محرك المحاكاة وربط العرض والصوت والتحكم.
-- [ ] اختبار اللعب الفعلي على أجهزة أندرويد وتحسين الأداء.
+- [x] محرك Genesis حقيقي مربوط بالعرض والصوت والحفظ.
+- [x] Bilinear filtering قابل للتبديل.
+- [x] D-pad + A/B/C + START متصلون فعليًا، مع multitouch.
+- [x] تحريك/تحجيم/شفافية التحكم وحفظ الإعدادات.
+- [x] اختبار instrumentation ناجح على محاكي Android: لمس فعلي، استجابة RAM، multitouch، وتبديل الفلتر، وحفظ Layout بعد إعادة إنشاء الـ Activity.
+- [x] بناء وتصدير APK وCI.
+- [ ] اختبار على هاتف فعلي واسع التنوع (لم يُجرَ بعد).
 
 ## الأمان وحقوق الألعاب
 
-- لا تضع كلمات المرور أو رموز الوصول أو مفاتيح التوقيع داخل Git. مفاتيح release ومتغيرات توقيعها موضحة في دليل البناء.
-- لا تُضمَّن ROMs إلا عند تمرير `--bundle-roms` أو `-PbundleRoms=true`. استخدم فقط ملفات تملك حق استخدامها وتوزيعها.
-- نسخ CI التطويرية قد تستخدم مفاتيح debug مختلفة بين الأجهزة أو التشغيلات. التحديث فوق نسخة موقّعة بمفتاح مختلف قد يتطلب حذف النسخة القديمة؛ احفظ بياناتك أولًا.
-
-## الخطوة التالية
-
-اختيار اللعبة الأولى ونظام Atari، ثم تنفيذ المحاكاة الحقيقية. **نجاح بناء APK الحالي يتحقق من التغليف فقط، ولا يعني أن لعبة أصبحت جاهزة للعب.**
+- لا تضع كلمات المرور أو رموز الوصول أو مفاتيح التوقيع داخل Git.
+- لا تُضمَّن ROMs إلا عند تمرير `--bundle-roms` أو `-PbundleRoms=true`، وبامتدادات `.a26/.bin/.a78/.md/.gen/.smd` فقط. استخدم فقط ملفات تملك حق استخدامها وتوزيعها.
+- Genesis Plus GX ومكوناته لها تراخيص محددة؛ التوزيع التجاري غير مسموح به وفق ترخيص المحرك. راجع الإشعارات المرفقة.
+- مفاتيح debug تختلف بين الأجهزة/تشغيلات CI؛ التحديث فوق توقيع مختلف قد يتطلب حذف النسخة القديمة. احفظ بياناتك أولًا.

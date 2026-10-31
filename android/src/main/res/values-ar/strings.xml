@@ -1,14 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">أتاري أندرويد</string>
-    <string name="scaffold_label">التحقق من تجهيز تطبيق أندرويد</string>
-    <string name="build_info">الإصدار %1$s\nمعرّف التطبيق: %2$s</string>
-    <string name="status_heading">حالة المشروع</string>
-    <string name="core_not_implemented">لم يُنفَّذ محرك المحاكاة أو اللعبة بعد. ملف APK هذا مخصص للتحقق من منظومة بناء أندرويد فقط.</string>
-    <string name="no_bundled_roms">لا توجد ملفات ألعاب مضمّنة في هذه النسخة.</string>
-    <string name="bundled_roms">أسماء ملفات الألعاب المضمّنة، وليست قابلة للتشغيل بعد:\n%1$s</string>
-    <string name="rom_read_error">تعذّرت قراءة أسماء ملفات الألعاب المضمّنة.</string>
-    <string name="refresh_roms">تحديث قائمة الألعاب</string>
-    <string name="next_step">الخطوة التالية: اختيار اللعبة، تنفيذ محرك المحاكاة، ثم اختبار اللعب على جهاز.</string>
-
+    <string name="app_name">سيجا-pocket</string>
+    <string name="import_rom">استيراد لعبة</string><string name="pause">إيقاف مؤقت</string><string name="resume">متابعة</string>
+    <string name="settings">الإعدادات</string><string name="reset_game">إعادة تشغيل اللعبة</string>
+    <string name="reset_warning">إعادة تشغيل اللعبة؟ ستفقد التقدم غير المحفوظ في ذاكرة اللعبة.</string>
+    <string name="reset">إعادة التشغيل</string><string name="cancel">إلغاء</string><string name="done">تم</string>
+    <string name="import_hint">استورد ملف Genesis / Mega Drive الذي تملك حق استخدامه، بصيغة md أو bin أو gen. لا يتضمن التطبيق أي لعبة.</string>
+    <string name="importing">جارٍ استيراد اللعبة…</string><string name="loading_rom">جارٍ تشغيل نواة سيجا…</string>
+    <string name="rom_read_error">تعذّرت قراءة الملف.</string><string name="rom_too_large">حجم اللعبة يتجاوز الحد المسموح: 16 ميجابايت.</string>
+    <string name="invalid_genesis_rom">الملف ليس لعبة Genesis خام مدعومة. ملفات ZIP وصور Sega CD غير مدعومة.</string>
+    <string name="emulator_error">تعذّر تشغيل اللعبة: %1$s</string>
+    <string name="bilinear_filter">تنعيم الحواف Bilinear</string><string name="haptics">اهتزاز عند اللمس</string>
+    <string name="mute">كتم الصوت</string><string name="control_size">حجم أزرار التحكم</string><string name="control_opacity">شفافية أزرار التحكم</string>
+    <string name="edit_layout">تحريك الأزرار على الشاشة</string><string name="reset_layout">استعادة مواضع وحجم الأزرار</string>
+    <string name="finish_layout">حفظ المواضع</string><string name="drag_controls">اسحب الاتجاهات أو A/B/C أو START، ثم احفظ.</string>
+    <string name="settings_explanation">تتوقف اللعبة أثناء ترتيب الأزرار ولا تُرسل لمساتEditMode مدخلات. تُحفظ المواضع والحجم والشفافية والتناعم تلقائيًا. ربط أزرار سيجا داخل النواة: A→Y وB→B وC→A.</string>
+    <string name="touch_controls_description">أزرار سيجا اللمسية: الاتجاهات وA وB وC وStart</string>
+<string name="third_party_notices">التراخيص وتنبيه الاستخدام غير التجاري</string>
 </resources>

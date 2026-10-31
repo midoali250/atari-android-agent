@@ -2,7 +2,7 @@
 
 ## ما الذي يبنيه المشروع الآن؟
 
-المشروع يحتوي على تطبيق أندرويد مبدئي لاختبار التغليف والتثبيت، ووحدة Java مستقلة. **لا يوجد محرك محاكاة أو لعبة قابلة للعب بعد.** إظهار ملف ROM داخل التطبيق لا يشغّله. عند إضافة المحرك واللعبة، تعمل منظومة البناء والتوقيع والتصدير نفسها على تضمين الشيفرة والأصول الجديدة.
+المشروع يحتوي على تطبيق أندرويد يشغّل ألعاب Sega Genesis / Mega Drive عبر Genesis Plus GX، مع تحكم لمسي وBilinear filtering وحفظ SRAM. **لا تُضمَّن أي ROM افتراضيًا.** استورد اللعبة من داخل التطبيق بعد التثبيت.
 
 الإعدادات الحالية:
 
@@ -12,12 +12,12 @@
 - Android SDK Platform: **35**؛ Build Tools: **35.0.0**.
 - أقل إصدار أندرويد: **Android 8.0 / API 26**.
 - `compileSdk` و`targetSdk`: **35**.
-- APK واحد لجميع المعماريات المدعومة: لا يعتمد على معمارية معالج معينة في النسخة المبدئية. عند إضافة مكتبات native، يجب مراجعة إعدادات ABI قبل التوزيع.
+- APK واحد لمعماريات `arm64-v8a` و`armeabi-v7a` و`x86_64` في release، ويضيف debug معمارية `x86` للمحاكي. تُبنى مكتبة JNI عبر NDK 27.0.12077973 وCMake 3.22.1.
 - معرّف نسخة التطوير: `com.midoali.atari.debug`؛ معرّف الإصدار: `com.midoali.atari`.
 
 ## 1. تجهيز البيئة محليًا
 
-ثبّت JDK 17 وAndroid Studio، ثم ثبّت Android SDK Platform 35 وBuild Tools 35.0.0 من SDK Manager. افتح **مجلد جذر المستودع** في Android Studio، وليس `android/` وحده.
+ثبّت JDK 17 وAndroid Studio، ثم ثبّت Android SDK Platform 35 وBuild Tools 35.0.0 وNDK 27.0.12077973 وCMake 3.22.1 من SDK Manager. افتح **مجلد جذر المستودع** في Android Studio، وليس `android/` وحده.
 
 اضبط `ANDROID_HOME` على مسار SDK، أو أنشئ `local.properties` محليًا بالقيمة المناسبة لجهازك، مثل:
 
@@ -57,7 +57,7 @@ scripts\build-apk.bat debug
 **الملف الناتج:**
 
 ```text
-artifacts/apk/atari-android-debug.apk
+artifacts/apk/sega-android-debug.apk
 ```
 
 يبني الأمر التطبيق ويوقّعه بمفتاح debug المحلي ثم ينسخه إلى المسار الثابت أعلاه. توقيع debug مناسب للتجربة والتثبيت اليدوي، وليس للتوزيع بوصفه إصدارًا نهائيًا. يمكن أن تختلف هوية المفتاح بين الأجهزة أو بين تشغيلات CI؛ تحديث تطبيق موقّع بمفتاح مختلف يتطلب حذف النسخة القديمة أولًا. لا تحذف بيانات مهمة قبل عمل نسخة احتياطية.
@@ -68,7 +68,7 @@ artifacts/apk/atari-android-debug.apk
 
 ```bash
 adb devices
-adb install -r artifacts/apk/atari-android-debug.apk
+adb install -r artifacts/apk/sega-android-debug.apk
 adb shell am start -n com.midoali.atari.debug/com.midoali.atari.MainActivity
 ```
 
@@ -95,15 +95,15 @@ adb uninstall com.midoali.atari.debug
 للتحقق من التوقيع والمحاذاة بعد البناء:
 
 ```bash
-"$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs artifacts/apk/atari-android-debug.apk
-"$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -p 4 artifacts/apk/atari-android-debug.apk
+"$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs artifacts/apk/sega-android-debug.apk
+"$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -p 4 artifacts/apk/sega-android-debug.apk
 ```
 
 على Windows استبدل `$ANDROID_HOME` بمسار SDK المناسب، واستخدم أدوات Build Tools الموجودة داخله.
 
 ## 4. تضمين ملفات ROM اختياريًا
 
-**لا تُضمَّن أي ملفات ROM افتراضيًا.** ضع فقط ملفات تملك حق استخدامها وتوزيعها داخل `roms/`. الامتدادات التي تُجمع عند تفعيل الخيار: `.a26` و`.bin` و`.a78`، دون المجلدات الفرعية. هذه أسماء امتدادات للتغليف فقط، وليست ضمانًا لتوافق اللعبة مع محرك لم يُنفّذ بعد.
+**لا تُضمَّن أي ملفات ROM افتراضيًا.** ضع فقط ملفات تملك حق استخدامها وتوزيعها داخل `roms/`. الامتدادات التي تُجمع عند تفعيل الخيار: `.a26` و`.bin` و`.a78` و`.md` و`.gen` و`.smd`، دون المجلدات الفرعية. هذه أسماء امتدادات للتغليف فقط؛ التطبيق يستورد ألعاب Genesis عبر واجهة الاستيراد بغض النظر عن هذه القائمة.
 
 ```bash
 ./scripts/build-apk.sh debug --bundle-roms
@@ -117,7 +117,7 @@ Windows:
 scripts\build-apk.bat debug --bundle-roms
 ```
 
-تُنسخ الملفات إلى أصول APK تحت `assets/roms/`. يعرض التطبيق أسماءها فقط؛ لا يشغّلها. يفشل البناء إذا طلبت التضمين ولم توجد ملفات مناسبة. بناء آخر مع `debug` بدون الخيار، أو `-PbundleRoms=false`، يمسح ملفات ROM من مجلد الأصول المولّد حتى لا تتسرب إلى البناء التالي.
+تُنسخ الملفات إلى أصول APK تحت `assets/roms/`. لا يشغّل التطبيق هذه الأصول تلقائيًا؛ الاستيراد الفعلي للعب يتم عبر Storage Access Framework إلى مساحة التطبيق الخاصة. يفشل البناء إذا طلبت التضمين ولم توجد ملفات مناسبة. بناء آخر مع `debug` بدون الخيار، أو `-PbundleRoms=false`، يمسح ملفات ROM من مجلد الأصول المولّد حتى لا تتسرب إلى البناء التالي.
 
 لا يعني استثناء الملفات من البناء أنها مستثناة تلقائيًا من Git. راجع الترخيص قبل إضافة أي ROM إلى المستودع.
 
@@ -156,7 +156,7 @@ scripts\build-apk.bat release
 الناتج:
 
 ```text
-artifacts/apk/atari-android-release.apk
+artifacts/apk/sega-android-release.apk
 ```
 
 يستخدم release تصغير الشيفرة والموارد عبر R8. راجع `android/proguard-rules.pro` واختبر الإصدار على جهاز عند إضافة المحرك أو مكتبات تستخدم reflection/JNI.
@@ -167,7 +167,7 @@ artifacts/apk/atari-android-release.apk
 
 مسار العمل `.github/workflows/android-apk.yml` يعمل عند الدفع إلى `main`، وعند pull request، أو يدويًا عبر **Actions → Android APK → Run workflow**.
 
-بعد نجاح التشغيل، نزّل الأرشيف من **Artifacts → atari-android-debug-apk**، ثم فك الضغط للحصول على APK وملف SHA-256. يشغّل المسار الاختبارات وlint، ويتحقق من توقيع APK والمحاذاة قبل رفعه. لا يحتاج إلى مفتاح release أو أسرار المستودع.
+بعد نجاح التشغيل، نزّل الأرشيف من **Artifacts → sega-android-debug-apk**، ثم فك الضغط للحصول على APK وملف SHA-256. يشغّل المسار الاختبارات وlint، ويتحقق من توقيع APK والمحاذاة قبل رفعه. لا يحتاج إلى مفتاح release أو أسرار المستودع.
 
 ### إصدار موقّع اختياري
 
@@ -180,7 +180,7 @@ artifacts/apk/atari-android-release.apk
 | `ATARI_KEY_ALIAS` | اسم alias للمفتاح |
 | `ATARI_KEY_PASSWORD` | كلمة المفتاح |
 
-ثم شغّل **Signed Android release**. خيار تضمين ROM مغلق افتراضيًا؛ فعّله فقط إذا كانت حقوق التوزيع تسمح. الناتج في **atari-android-release-apk**. يُفك المفتاح إلى ملف مؤقت أثناء البناء ويُمسح بعده. هذه الأسرار غير مضبوطة تلقائيًا، ولم يُضف أي مفتاح توقيع إلى Git.
+ثم شغّل **Signed Android release**. خيار تضمين ROM مغلق افتراضيًا؛ فعّله فقط إذا كانت حقوق التوزيع تسمح. الناتج في **sega-android-release-apk**. يُفك المفتاح إلى ملف مؤقت أثناء البناء ويُمسح بعده. هذه الأسرار غير مضبوطة تلقائيًا، ولم يُضف أي مفتاح توقيع إلى Git.
 
 ملفات APK وArtifacts ليست بديلًا عن نشر Google Play. لا يوجد نشر تلقائي إلى المتجر في هذه الإعدادات.
 
@@ -193,4 +193,4 @@ artifacts/apk/atari-android-release.apk
 - **INSTALL_FAILED_UPDATE_INCOMPATIBLE:** مفتاح توقيع النسخة الموجودة مختلف. استخدم المفتاح الأصلي أو احذف النسخة القديمة بعد حفظ بياناتها.
 - **تنزيل Gradle أو تبعياته فشل:** يتطلب أول بناء اتصالًا بالإنترنت للوصول إلى مستودعات Gradle وGoogle وMaven Central.
 
-الخطوة الخاصة باللعبة نفسها ما زالت مفتوحة: اختيار اللعبة والنظام، تنفيذ المحرك، ثم اختبار التشغيل الفعلي. نجاح تغليف APK لا يعني نجاح محاكاة اللعبة.
+اختبار اللمس الفعلي على المحاكي موثق في [سجل التحقق](VERIFICATION.md). لم يُجرَ بعد اختبار واسع على هواتف فعلية متنوعة.

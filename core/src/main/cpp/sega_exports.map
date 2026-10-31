@@ -1,0 +1,4 @@
+{
+  global: Java_*; retro_*;
+  local: *;
+};

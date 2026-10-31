@@ -32,13 +32,13 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
       - name: Install pinned SDK packages
-        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.0.12077973' 'cmake;3.22.1'
       - name: Test, lint and export debug APK
         run: ./gradlew :core:test :android:testDebugUnitTest :android:lintDebug :android:exportDebugApk --no-daemon --stacktrace
       - name: Verify APK signature, alignment and manifest
         run: |
           set -euo pipefail
-          APK=artifacts/apk/atari-android-debug.apk
+          APK=artifacts/apk/sega-android-debug.apk
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/zipalign" -c -p 4 "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | head -25
@@ -46,9 +46,9 @@ jobs:
       - name: Upload installable debug APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: atari-android-debug-apk
+          name: sega-android-debug-apk
           path: |
-            artifacts/apk/atari-android-debug.apk
+            artifacts/apk/sega-android-debug.apk
             artifacts/apk/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 14

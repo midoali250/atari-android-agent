@@ -1,14 +1,7 @@
 package com.midoali.atari.core;
-
-/** Honest build-scaffold status; this is not an emulator implementation. */
+/** Reports whether a real emulation core is connected to the application. */
 public final class CoreStatus {
     private CoreStatus() {}
-
-    public static boolean isEmulatorImplemented() {
-        return false;
-    }
-
-    public static String message() {
-        return "No emulator or game is implemented yet. This APK verifies Android packaging only.";
-    }
+    public static boolean isEmulatorImplemented() { return true; }
+    public static String message() { return "Genesis Plus GX is connected; import a legally obtained Genesis ROM to play."; }
 }

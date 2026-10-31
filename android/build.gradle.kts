@@ -29,6 +29,7 @@ if (releaseSigningConfigured) {
 
 android {
     namespace = "com.midoali.atari"
+    ndkVersion = "27.0.12077973"
     compileSdk = 35
     buildToolsVersion = "35.0.0"
 
@@ -36,8 +37,18 @@ android {
         applicationId = "com.midoali.atari"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
+        externalNativeBuild { cmake { arguments += "-DANDROID_STL=none" } }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("../core/src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     buildFeatures {
@@ -57,6 +68,8 @@ android {
 
     buildTypes {
         debug {
+            ndk { abiFilters += "x86" } // Instrumentation on the 32-bit emulator.
+            externalNativeBuild { cmake { arguments += "-DSEGA_TEST_API=ON" } }
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
             // AGP supplies the local Android debug signing configuration.
@@ -96,17 +109,17 @@ android {
                 include("*")
                 exclude { element ->
                     !element.file.isFile ||
-                        element.file.extension.lowercase() !in setOf("a26", "bin", "a78")
+                        element.file.extension.lowercase() !in setOf("a26", "bin", "a78", "md", "gen", "smd")
                 }
             }
         }
         doFirst {
             if (bundledRomsRequested) {
                 val roms = rootProject.file("roms").listFiles().orEmpty().filter {
-                    it.isFile && it.extension.lowercase() in setOf("a26", "bin", "a78")
+                    it.isFile && it.extension.lowercase() in setOf("a26", "bin", "a78", "md", "gen", "smd")
                 }
                 if (roms.isEmpty()) {
-                    throw GradleException("bundleRoms=true requires at least one .a26, .bin, or .a78 file in roms/.")
+                    throw GradleException("bundleRoms=true requires at least one .a26, .bin, .a78, .md, .gen, or .smd file in roms/.")
                 }
             }
         }
@@ -119,12 +132,15 @@ android {
 }
 
 base {
-    archivesName = "atari-android"
+    archivesName = "sega-android"
 }
 
 dependencies {
     implementation(project(":core"))
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }
 
 val verifyReleaseSigning = tasks.register("verifyReleaseSigning") {
@@ -139,7 +155,7 @@ val verifyReleaseSigning = tasks.register("verifyReleaseSigning") {
     }
 }
 
-// Stable, universal APK outputs (no ABI split: this scaffold contains no native libraries).
+// One APK containing arm64-v8a, armeabi-v7a and x86_64 native cores.
 androidComponents {
     onVariants { variant ->
         val variantName = variant.name
@@ -151,16 +167,16 @@ androidComponents {
             if (variantName == "release") {
                 dependsOn(verifyReleaseSigning)
             }
-            from(layout.buildDirectory.file("outputs/apk/$variantName/atari-android-$variantName.apk"))
+            from(layout.buildDirectory.file("outputs/apk/$variantName/sega-android-$variantName.apk"))
             into(rootProject.layout.projectDirectory.dir("artifacts/apk"))
-            rename { "atari-android-$variantName.apk" }
+            rename { "sega-android-$variantName.apk" }
             doFirst {
                 if (variantName == "release" && !releaseSigningConfigured) {
                     throw GradleException("Release signing is not configured; see verifyReleaseSigning.")
                 }
             }
             doLast {
-                val exported = rootProject.file("artifacts/apk/atari-android-$variantName.apk")
+                val exported = rootProject.file("artifacts/apk/sega-android-$variantName.apk")
                 check(exported.isFile && exported.length() > 0) { "APK export failed: $exported" }
                 logger.lifecycle("Exported APK: ${exported.absolutePath}")
             }
