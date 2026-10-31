@@ -6,9 +6,16 @@ Thumbs.db
 
 # Android / Gradle
 .gradle/
+.kotlin/
 **/build/
 local.properties
 .cxx/
+
+# Exported APKs are delivered as workflow artifacts, not committed binaries.
+artifacts/
+*.apk
+*.aab
+*.idsig
 
 # Signing keys and local credentials
 *.jks

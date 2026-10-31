@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Atari Android</string>
+    <string name="scaffold_label">Android packaging verification</string>
+    <string name="build_info">Version %1$s\nPackage: %2$s</string>
+    <string name="status_heading">Project status</string>
+    <string name="core_not_implemented">No emulator or game is implemented yet. This APK verifies Android packaging only.</string>
+    <string name="no_bundled_roms">No ROMs are bundled in this build.</string>
+    <string name="bundled_roms">Bundled ROM filenames (not playable yet):\n%1$s</string>
+    <string name="rom_read_error">Could not read bundled ROM filenames.</string>
+    <string name="refresh_roms">Refresh ROM list</string>
+    <string name="next_step">Next: choose a game, implement the emulator core, then test gameplay on a device.</string>
+</resources>

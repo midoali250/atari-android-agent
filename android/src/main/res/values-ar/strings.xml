@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">أتاري أندرويد</string>
+    <string name="scaffold_label">التحقق من تجهيز تطبيق أندرويد</string>
+    <string name="build_info">الإصدار %1$s\nمعرّف التطبيق: %2$s</string>
+    <string name="status_heading">حالة المشروع</string>
+    <string name="core_not_implemented">لم يُنفَّذ محرك المحاكاة أو اللعبة بعد. ملف APK هذا مخصص للتحقق من منظومة بناء أندرويد فقط.</string>
+    <string name="no_bundled_roms">لا توجد ملفات ألعاب مضمّنة في هذه النسخة.</string>
+    <string name="bundled_roms">أسماء ملفات الألعاب المضمّنة، وليست قابلة للتشغيل بعد:\n%1$s</string>
+    <string name="rom_read_error">تعذّرت قراءة أسماء ملفات الألعاب المضمّنة.</string>
+    <string name="refresh_roms">تحديث قائمة الألعاب</string>
+    <string name="next_step">الخطوة التالية: اختيار اللعبة، تنفيذ محرك المحاكاة، ثم اختبار اللعب على جهاز.</string>
+
+</resources>
