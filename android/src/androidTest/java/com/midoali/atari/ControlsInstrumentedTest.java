@@ -3,7 +3,6 @@ package com.midoali.atari;
 import static org.junit.Assert.*;
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.opengl.GLES20;
 import android.os.SystemClock;
 import android.view.InputDevice;
 import android.view.MotionEvent;
@@ -77,8 +76,22 @@ public class ControlsInstrumentedTest {
         ApplicationProvider.getApplicationContext().getSharedPreferences("sega-settings",0).edit().clear().commit();
         Intent intent=new Intent(ApplicationProvider.getApplicationContext(),MainActivity.class).putExtra(MainActivity.EXTRA_TEST_ROM,path);
         try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(intent)){
-            await(scenario,a->a.engineForTest().frame()!=null&&a.rendererForTest().frameSerial()>120);
+            await(scenario,a->a.engineForTest().frame()!=null&&a.videoForTest().frameSerial()>120);
             assertEquals(6,activity(scenario).controlsForTest().faceButtonCount());
+            // Regression: video must actually present non-black pixels (v0.4 black-screen bug).
+            await(scenario,a->a.videoForTest().nonBlackFrameSeen());
+            AtomicReference<android.graphics.Bitmap> shotRef=new AtomicReference<>();
+            scenario.onActivity(a->shotRef.set(a.videoForTest().captureForTest()));
+            android.graphics.Bitmap shot=shotRef.get();
+            boolean anyLit=false;
+            for(int y=0;y<shot.getHeight()&&!anyLit;y+=4)for(int x=0;x<shot.getWidth();x+=4){int c=shot.getPixel(x,y);if((c&0x00ffffff)!=0){anyLit=true;break;}}
+            assertTrue("Video view rendered black",anyLit);
+            scenario.onActivity(a->shot.recycle());
+            // Gear opens the side menu without using Back.
+            scenario.onActivity(a->a.gearForTest().performClick());
+            assertTrue(activity(scenario).isSidePanelOpen());
+            scenario.onActivity(a->a.gearForTest().performClick());
+            assertFalse(activity(scenario).isSidePanelOpen());
             // All waits/injections run on the test thread, never block the UI dispatcher.
             tap(activity(scenario),SegaButtons.START,300);SystemClock.sleep(12000);
             tap(activity(scenario),SegaButtons.START,300);SystemClock.sleep(12000);
@@ -89,16 +102,16 @@ public class ControlsInstrumentedTest {
                 tap(activity(scenario),button,button>=SegaButtons.UP?650:220);screenshot(activity(scenario),"input-"+button);
             }
             multitouch(activity(scenario));
-            scenario.onActivity(a->a.rendererForTest().setVideoMode(com.midoali.atari.core.ControlLayout.VIDEO_ENHANCED));
-            await(scenario,a->a.rendererForTest().appliedVideoMode()==com.midoali.atari.core.ControlLayout.VIDEO_ENHANCED);screenshot(activity(scenario),"enhanced");
-            scenario.onActivity(a->a.rendererForTest().setVideoMode(com.midoali.atari.core.ControlLayout.VIDEO_ORIGINAL));
-            await(scenario,a->a.rendererForTest().appliedFilter()==GLES20.GL_NEAREST);screenshot(activity(scenario),"original");
-            scenario.onActivity(a->a.rendererForTest().setVideoMode(com.midoali.atari.core.ControlLayout.VIDEO_SMOOTH));
-            await(scenario,a->a.rendererForTest().appliedFilter()==GLES20.GL_LINEAR);screenshot(activity(scenario),"smooth");
-            scenario.onActivity(a->a.rendererForTest().setDisplayMode(com.midoali.atari.core.ControlLayout.DISPLAY_STRETCH));
-            await(scenario,a->{int[] vp=a.rendererForTest().appliedViewport();return vp[2]==a.controlsForTest().getWidth()&&vp[3]==a.controlsForTest().getHeight();});
-            scenario.onActivity(a->a.rendererForTest().setDisplayMode(com.midoali.atari.core.ControlLayout.DISPLAY_FIT));
-            await(scenario,a->{int[] vp=a.rendererForTest().appliedViewport();return vp[0]>=0&&vp[1]>=0&&vp[2]<=a.controlsForTest().getWidth()&&vp[3]<=a.controlsForTest().getHeight();});
+            scenario.onActivity(a->a.videoForTest().setVideoMode(com.midoali.atari.core.ControlLayout.VIDEO_ENHANCED));
+            await(scenario,a->a.videoForTest().appliedVideoMode()==com.midoali.atari.core.ControlLayout.VIDEO_ENHANCED);screenshot(activity(scenario),"enhanced");
+            scenario.onActivity(a->a.videoForTest().setVideoMode(com.midoali.atari.core.ControlLayout.VIDEO_ORIGINAL));
+            await(scenario,a->a.videoForTest().appliedFilter()==SoftwareVideoView.FILTER_NEAREST);screenshot(activity(scenario),"original");
+            scenario.onActivity(a->a.videoForTest().setVideoMode(com.midoali.atari.core.ControlLayout.VIDEO_SMOOTH));
+            await(scenario,a->a.videoForTest().appliedFilter()==SoftwareVideoView.FILTER_LINEAR);screenshot(activity(scenario),"smooth");
+            scenario.onActivity(a->a.videoForTest().setDisplayMode(com.midoali.atari.core.ControlLayout.DISPLAY_STRETCH));
+            await(scenario,a->{int[] vp=a.videoForTest().appliedViewport();return vp[2]==a.controlsForTest().getWidth()&&vp[3]==a.controlsForTest().getHeight();});
+            scenario.onActivity(a->a.videoForTest().setDisplayMode(com.midoali.atari.core.ControlLayout.DISPLAY_FIT));
+            await(scenario,a->{int[] vp=a.videoForTest().appliedViewport();return vp[0]>=0&&vp[1]>=0&&vp[2]<=a.controlsForTest().getWidth()&&vp[3]<=a.controlsForTest().getHeight();});
             screenshot(activity(scenario),"fit-full");
             MainActivity a=activity(scenario);float old=a.controlsForTest().centerX(0);
             scenario.onActivity(x->x.controlsForTest().setEditing(true));
@@ -108,7 +121,7 @@ public class ControlsInstrumentedTest {
             assertTrue(a.controlsForTest().centerX(0)>old);assertEquals(0,a.engineForTest().inputMask());
             scenario.onActivity(x->{x.layoutForTest().setScale(1.3f);x.layoutForTest().setOpacity(.5f);x.layoutForTest().bilinear=true;new SettingsStore(x).save(x.layoutForTest());x.controlsForTest().setEditing(false);});
             screenshot(a,"layout-edit");
-            scenario.recreate();await(scenario,restored->restored.engineForTest().frame()!=null&&restored.rendererForTest().appliedFilter()==GLES20.GL_LINEAR);
+            scenario.recreate();await(scenario,restored->restored.engineForTest().frame()!=null&&restored.videoForTest().appliedFilter()==SoftwareVideoView.FILTER_LINEAR);
             scenario.onActivity(restored->{assertEquals(1.3f,restored.layoutForTest().scale,.001);assertEquals(.5f,restored.layoutForTest().opacity,.001);assertTrue(restored.layoutForTest().padX>.16f);assertTrue(restored.layoutForTest().bilinear);assertTrue(restored.layoutForTest().sixButton);assertEquals(6,restored.controlsForTest().faceButtonCount());});
         }
     }

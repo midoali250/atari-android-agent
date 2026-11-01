@@ -17,11 +17,10 @@
     <string name="show_borders">إظهار حدود الشاشة الأصلية (إلغاء قص الحواف)</string>
     <string name="auto_frame_skip">تخطي إطارات تلقائي على الأجهزة البطيئة</string>
     <string name="perf_readout">المحاكاة: %1$.1f إطار/ث | النواة: %2$.2f مللي ث/إطار | %3$d×%4$d | انقطاع الصوت: %5$d</string>
-    <string name="toolbar_hint">اضغط على الحافة العلوية للشاشة لإظهار القائمة أو إخفائها.</string>
     <string-array name="video_quality_modes">
         <item>البكسل الأصلي</item>
         <item>ناعم (Bilinear)</item>
-        <item>محسّن (Bicubic)</item>
+        <item>محسّن (تنعيم إضافي)</item>
     </string-array>
     <string-array name="display_modes">
         <item>الصورة كاملة بدون قص</item>
@@ -33,4 +32,8 @@
     <string name="settings_explanation">أثناء الترتيب تتوقف اللعبة ولا تُرسل اللمسات مدخلات. تُحفظ المواضع والحجم والشفافية وخيارات الصورة تلقائيًا. ربط 6 أزرار: A→Y وB→B وC→A وX→L وY→X وZ→R.</string>
     <string name="touch_controls_description">أزرار سيجا اللمسية: الاتجاهات وX وY وZ وA وB وC وStart</string>
     <string name="third_party_notices">التراخيص وتنبيه الاستخدام غير التجاري</string>
+    <string name="video_surface_description">صورة لعبة جينيسيس</string>
+    <string name="menu_open">فتح القائمة والإعدادات</string>
+    <string name="menu_close">إغلاق القائمة</string>
+    <string name="gear_hint">اضغط على الترس أعلى يسار الشاشة لفتح القائمة الجانبية.</string>
 </resources>

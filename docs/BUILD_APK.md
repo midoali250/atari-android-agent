@@ -2,7 +2,7 @@
 
 ## ما الذي يبنيه المشروع الآن؟
 
-المشروع يحتوي على تطبيق أندرويد يشغّل ألعاب Sega Genesis / Mega Drive عبر Genesis Plus GX، مع يد سيجا 6 أزرار، أوضاع صورة Original/Smooth/Enhanced، عرض كامل بدون قص، وحفظ SRAM. **لا تُضمَّن أي ROM افتراضيًا.** استورد اللعبة من داخل التطبيق بعد التثبيت، أو ابنِ نسخة شخصية مضمّنة كما في القسم 4.1.
+المشروع يحتوي على تطبيق أندرويد يشغّل ألعاب Sega Genesis / Mega Drive عبر Genesis Plus GX، مع يد سيجا 6 أزرار، أوضاع صورة Original/Smooth/Enhanced عبر Canvas/Bitmap، عرض كامل بدون قص، زر ترس لقائمة جانبية، وحفظ SRAM. **لا تُضمَّن أي ROM افتراضيًا.** استورد اللعبة من داخل التطبيق بعد التثبيت، أو ابنِ نسخة شخصية مضمّنة كما في القسم 4.1.
 
 الإعدادات الحالية:
 
@@ -129,7 +129,7 @@ scripts\build-apk.bat debug --bundle-roms
 cp /path/to/game.md roms/game.md
 ./gradlew :android:exportReleaseApk \
   -PbundleRoms=true -PpersonalGame=true \
-  -PgameApplicationId=com.midoali.umk3.six -PgameLabel=UMK3
+  -PgameApplicationId=com.midoali.umk3.v5 -PgameLabel=UMK3
 ```
 
 - `personalGame=true` يخفي زر الاستيراد ويشغّل أول ROM مضمّنة تلقائيًا.

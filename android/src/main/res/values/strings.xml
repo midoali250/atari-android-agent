@@ -18,11 +18,10 @@
     <string name="show_borders">Show console borders (disable overscan crop)</string>
     <string name="auto_frame_skip">Auto frame skip on slow devices</string>
     <string name="perf_readout">Emulation: %1$.1f fps | core: %2$.2f ms/frame | %3$d×%4$d | audio underruns: %5$d</string>
-    <string name="toolbar_hint">Tap the top edge of the screen to show or hide the menu.</string>
     <string-array name="video_quality_modes">
         <item>Original pixels</item>
         <item>Smooth (bilinear)</item>
-        <item>Enhanced (bicubic)</item>
+        <item>Enhanced (smooth+)</item>
     </string-array>
     <string-array name="display_modes">
         <item>Fit full image (no crop)</item>
@@ -34,4 +33,8 @@
     <string name="settings_explanation">While editing, the game is paused and touches do not send input. Layout, size, opacity and video options are saved automatically. Six-button mapping: A→Y, B→B, C→A, X→L, Y→X, Z→R.</string>
     <string name="touch_controls_description">Genesis touch controls: directional pad, X, Y, Z, A, B, C and Start</string>
     <string name="third_party_notices">Licenses / non-commercial notice</string>
+    <string name="video_surface_description">Genesis game video</string>
+    <string name="menu_open">Open menu and settings</string>
+    <string name="menu_close">Close menu</string>
+    <string name="gear_hint">Tap the gear at the top-left edge to open the side menu.</string>
 </resources>
