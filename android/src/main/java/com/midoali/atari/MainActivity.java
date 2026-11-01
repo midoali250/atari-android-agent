@@ -3,6 +3,7 @@ package com.midoali.atari;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -10,6 +11,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
+import android.view.PixelCopy;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
@@ -39,13 +41,58 @@ public final class MainActivity extends Activity {
     private SettingsStore settingsStore;
     private ControlLayout layout;
     private TouchControlsView controls;
-    private SoftwareVideoView video;
+    private GameSurfaceView video;
+    private SoftwareVideoView fallbackVideo;
+    private boolean usingFallback, pixelCopyPending;
     private TextView status, perf;
     private Button resumeButton, editDone;
     private ImageButton gear;
     private LinearLayout sidePanel;
     private boolean foreground, userPaused, loading, destroyed, panelOpen, resumeAfterPanel;
     private String bundledAsset;
+    private final Runnable videoWatchdog = new Runnable() {
+        @Override public void run() {
+            if (destroyed || usingFallback || !engine.isLoaded()) return;
+            // If the native surface never presented frames, switch to the Canvas fallback.
+            if (video.presentedFrames() < 10) {
+                switchToFallback();
+                return;
+            }
+            // Some devices present a surface but composite it black. Sample the actual
+            // surface once; if it is fully black while the core has video, fall back.
+            if (!pixelCopyPending && video.nonBlackFrameSeen()) {
+                pixelCopyPending = true;
+                Bitmap sample = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888);
+                try {
+                    PixelCopy.request(video, sample, result -> {
+                        pixelCopyPending = false;
+                        if (destroyed || usingFallback) { sample.recycle(); return; }
+                        boolean black = true;
+                        if (result == PixelCopy.SUCCESS) {
+                            for (int y = 0; y < 64 && black; y += 4)
+                                for (int x = 0; x < 64; x += 4)
+                                    if ((sample.getPixel(x, y) & 0x00ffffff) != 0) { black = false; break; }
+                        } else black = false;
+                        sample.recycle();
+                        if (black) switchToFallback();
+                    }, handler);
+                } catch (RuntimeException e) {
+                    pixelCopyPending = false;
+                    sample.recycle();
+                }
+            }
+            handler.postDelayed(this, 4000);
+        }
+    };
+    private void switchToFallback() {
+        if (usingFallback || destroyed) return;
+        usingFallback = true;
+        video.setVisibility(View.GONE);
+        fallbackVideo.setVisibility(View.VISIBLE);
+        engine.setFrameListener(fallbackVideo::requestFrame);
+        fallbackVideo.requestFrame();
+        Toast.makeText(this, R.string.video_fallback, Toast.LENGTH_SHORT).show();
+    }
     private final Runnable updatePerf = new Runnable() {
         @Override public void run() {
             if (!panelOpen || perf == null) return;
@@ -62,10 +109,14 @@ public final class MainActivity extends Activity {
         bundledAsset = findBundledRomAsset();
         FrameLayout root = new FrameLayout(this); root.setBackgroundColor(Color.BLACK);
 
-        video = new SoftwareVideoView(this, engine);
+        video = new GameSurfaceView(this, engine);
         video.setVideoMode(layout.videoMode); video.setDisplayMode(layout.displayMode);
+        fallbackVideo = new SoftwareVideoView(this, engine);
+        fallbackVideo.setVideoMode(layout.videoMode); fallbackVideo.setDisplayMode(layout.displayMode);
+        fallbackVideo.setVisibility(View.GONE);
         engine.setFrameListener(video::requestFrame);
         root.addView(video, new FrameLayout.LayoutParams(-1, -1));
+        root.addView(fallbackVideo, new FrameLayout.LayoutParams(-1, -1));
 
         controls = new TouchControlsView(this);
         controls.setLayout(layout); controls.setInputSink(engine::setInput);
@@ -119,7 +170,7 @@ public final class MainActivity extends Activity {
         sidePanel.setClickable(true); // block gameplay touches while open
 
         LinearLayout header = new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title = new TextView(this); title.setText(R.string.settings); title.setTextColor(Color.WHITE); title.setTextSize(18);
+        TextView title = new TextView(this); title.setText(getString(R.string.settings) + "  ·  v" + BuildConfig.VERSION_NAME); title.setTextColor(Color.WHITE); title.setTextSize(16);
         header.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
         ImageButton close = new ImageButton(this); close.setImageResource(R.drawable.ic_close); close.setColorFilter(Color.WHITE);
         close.setBackgroundColor(0x00000000); close.setContentDescription(getString(R.string.menu_close));
@@ -152,12 +203,12 @@ public final class MainActivity extends Activity {
         six.setOnCheckedChangeListener((v, checked) -> { layout.sixButton = checked; engine.setSixButton(checked); controls.setLayout(layout); settingsStore.save(layout); });
         spinner(content, R.string.video_quality, R.array.video_quality_modes, layout.videoMode, new SimpleSpinner() {
             @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                layout.setVideoMode(position); video.setVideoMode(position); settingsStore.save(layout);
+                layout.setVideoMode(position); video.setVideoMode(position); fallbackVideo.setVideoMode(position); settingsStore.save(layout);
             }
         });
         spinner(content, R.string.display_mode, R.array.display_modes, layout.displayMode, new SimpleSpinner() {
             @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                layout.setDisplayMode(position); video.setDisplayMode(position); settingsStore.save(layout);
+                layout.setDisplayMode(position); video.setDisplayMode(position); fallbackVideo.setDisplayMode(position); settingsStore.save(layout);
             }
         });
         CheckBox borders = new CheckBox(this); borders.setText(R.string.show_borders); borders.setChecked(layout.showBorders); borders.setTextColor(Color.WHITE); content.addView(borders);
@@ -306,8 +357,9 @@ public final class MainActivity extends Activity {
                     loading = false; userPaused = false; settingsStore.preferences().edit().putString("lastRom", rom.getAbsolutePath()).apply();
                     status.setVisibility(View.GONE); controls.setInteractive(true); syncPause(); hideSystemBars();
                     video.requestFrame();
+                    handler.postDelayed(videoWatchdog, 4000);
                     if (!settingsStore.preferences().getBoolean("gearHintShown", false)) {
-                        Toast.makeText(this, R.string.gear_hint, Toast.LENGTH_LONG).show();
+                        Toast.makeText(this, getString(R.string.native_ready) + " v" + BuildConfig.VERSION_NAME + "\n" + getString(R.string.gear_hint), Toast.LENGTH_LONG).show();
                         settingsStore.preferences().edit().putBoolean("gearHintShown", true).apply();
                     }
                 });
@@ -331,15 +383,16 @@ public final class MainActivity extends Activity {
         else if (controls.isEditing()) finishEditing();
         else super.onBackPressed();
     }
-    @Override protected void onResume() { super.onResume(); foreground = true; syncPause(); hideSystemBars(); video.requestFrame(); }
+    @Override protected void onResume() { super.onResume(); foreground = true; syncPause(); hideSystemBars(); video.requestFrame(); fallbackVideo.requestFrame(); }
     @Override protected void onPause() { foreground = false; controls.clearInput(); engine.setPaused(true); engine.persistSave(); handler.removeCallbacks(updatePerf); super.onPause(); }
-    @Override protected void onDestroy() { destroyed = true; handler.removeCallbacksAndMessages(null); engine.close(); io.shutdown(); video.release(); super.onDestroy(); }
+    @Override protected void onDestroy() { destroyed = true; handler.removeCallbacksAndMessages(null); engine.close(); io.shutdown(); video.release(); fallbackVideo.release(); super.onDestroy(); }
     @Override public void onWindowFocusChanged(boolean focused) { super.onWindowFocusChanged(focused); if (focused) hideSystemBars(); }
     private void hideSystemBars() { getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE); }
     private int dp(float value) { return Math.round(value * getResources().getDisplayMetrics().density); }
     EmulatorEngine engineForTest() { return engine; }
     TouchControlsView controlsForTest() { return controls; }
-    SoftwareVideoView videoForTest() { return video; }
+    GameSurfaceView videoForTest() { return video; }
+    SoftwareVideoView fallbackVideoForTest() { return fallbackVideo; }
     ControlLayout layoutForTest() { return layout; }
     ImageButton gearForTest() { return gear; }
     boolean isSidePanelOpen() { return panelOpen; }

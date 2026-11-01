@@ -105,9 +105,9 @@ public class ControlsInstrumentedTest {
             scenario.onActivity(a->a.videoForTest().setVideoMode(com.midoali.atari.core.ControlLayout.VIDEO_ENHANCED));
             await(scenario,a->a.videoForTest().appliedVideoMode()==com.midoali.atari.core.ControlLayout.VIDEO_ENHANCED);screenshot(activity(scenario),"enhanced");
             scenario.onActivity(a->a.videoForTest().setVideoMode(com.midoali.atari.core.ControlLayout.VIDEO_ORIGINAL));
-            await(scenario,a->a.videoForTest().appliedFilter()==SoftwareVideoView.FILTER_NEAREST);screenshot(activity(scenario),"original");
+            await(scenario,a->a.videoForTest().appliedFilter()==GameSurfaceView.FILTER_NEAREST);screenshot(activity(scenario),"original");
             scenario.onActivity(a->a.videoForTest().setVideoMode(com.midoali.atari.core.ControlLayout.VIDEO_SMOOTH));
-            await(scenario,a->a.videoForTest().appliedFilter()==SoftwareVideoView.FILTER_LINEAR);screenshot(activity(scenario),"smooth");
+            await(scenario,a->a.videoForTest().appliedFilter()==GameSurfaceView.FILTER_LINEAR);screenshot(activity(scenario),"smooth");
             scenario.onActivity(a->a.videoForTest().setDisplayMode(com.midoali.atari.core.ControlLayout.DISPLAY_STRETCH));
             await(scenario,a->{int[] vp=a.videoForTest().appliedViewport();return vp[2]==a.controlsForTest().getWidth()&&vp[3]==a.controlsForTest().getHeight();});
             scenario.onActivity(a->a.videoForTest().setDisplayMode(com.midoali.atari.core.ControlLayout.DISPLAY_FIT));
@@ -121,7 +121,7 @@ public class ControlsInstrumentedTest {
             assertTrue(a.controlsForTest().centerX(0)>old);assertEquals(0,a.engineForTest().inputMask());
             scenario.onActivity(x->{x.layoutForTest().setScale(1.3f);x.layoutForTest().setOpacity(.5f);x.layoutForTest().bilinear=true;new SettingsStore(x).save(x.layoutForTest());x.controlsForTest().setEditing(false);});
             screenshot(a,"layout-edit");
-            scenario.recreate();await(scenario,restored->restored.engineForTest().frame()!=null&&restored.videoForTest().appliedFilter()==SoftwareVideoView.FILTER_LINEAR);
+            scenario.recreate();await(scenario,restored->restored.engineForTest().frame()!=null&&restored.videoForTest().appliedFilter()==GameSurfaceView.FILTER_LINEAR);
             scenario.onActivity(restored->{assertEquals(1.3f,restored.layoutForTest().scale,.001);assertEquals(.5f,restored.layoutForTest().opacity,.001);assertTrue(restored.layoutForTest().padX>.16f);assertTrue(restored.layoutForTest().bilinear);assertTrue(restored.layoutForTest().sixButton);assertEquals(6,restored.controlsForTest().faceButtonCount());});
         }
     }
